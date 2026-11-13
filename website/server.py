@@ -249,7 +249,7 @@ async def invoke_operation(request: Request):
         ledger.append_event({"type":"operation_invoke","request": op,"grant": dict(grant),"task_class": task_class})
         return {"contract":"r3a.steward-operation-result.v1","correlation_id": f"r5-op-{int(time.time())}","status":"completed","result":{"mode":"lightweight","message": f"R5 lean CME dispatched: {op.get('text','')[:200]}","grant": dict(grant)},"observation": dict(obs)}
     except Exception as e:
-        return JSONResponse(status_code=500, content={"contract":"r3a.steward-operation-result.v1","error":{"code":"dispatch_failed","message": str(e)},"correlation_id": f"r5-err-{int(time.time())}"})
+        return JSONResponse(status_code=500, content={"contract":"r3a.steward-operation-result.v1","error":{"code":"dispatch_failed","message": str(e)[:2000] if isinstance(e, (str, Exception)) else str(type(e).__name__)+": "+str(e)[:1900]},"correlation_id": f"r5-err-{int(time.time())}"})
 
 @app.get("/api/status")
 async def legacy_status():
