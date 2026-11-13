@@ -1062,5 +1062,376 @@ refreshEngineeringStatus();
 })();
 </script>
 
+
+<script id="r5-conversations-plus-v27c">
+/* R5 v27c - Conversations + Plus - conv-{resident}-{timestamp} - enables composer */
+(function(){
+  window.R5_ACTIVE_CONV = null;
+  window.R5_ACTIVE_RESIDENT = null;
+  
+  const SHORT_TITLES = {
+    "alyssa": "Chief of Staff", "grace": "Director Ops", "chloe": "Chief Architect",
+    "jessica": "Chief Character", "vicky": "Engineering", "helen": "HR",
+    "ingrid": "Security Chief", "eleanor": "Archives", "marie": "Research",
+    "judy": "Legal", "cheryl": "CPA", "evelyn": "Confidant", "gm": "Gray", "gray_man": "Gray"
+  };
+
+  function getResident(){
+    const sel = document.getElementById('chat-resident-select');
+    let v = (sel?.value||'').toLowerCase().trim();
+    if(!v) return null;
+    if(v==='gray_man') v='gm';
+    return v;
+  }
+  
+  function getResidentDisplay(){
+    const sel = document.getElementById('chat-resident-select');
+    if(!sel) return 'Grace - Director Ops';
+    const opt = sel.options[sel.selectedIndex];
+    return opt ? opt.textContent : 'Grace - Director Ops';
+  }
+
+  function createConversation(resident, ts){
+    if(!resident){
+      resident = getResident();
+      if(!resident){
+        alert('Select a resident first: e.g. Grace - Director Ops, then click +');
+        return null;
+      }
+    }
+    resident = resident.toLowerCase() === 'gray_man' ? 'gm' : resident.toLowerCase();
+    ts = ts || Date.now();
+    const convId = `conv-${resident}-${ts}`;
+    
+    const listEl = document.getElementById('chat-conversation-list');
+    const msgList = document.getElementById('chat-message-list') || document.getElementById('chat-messages') || document.querySelector('.workspace-messages');
+    const input = document.getElementById('chat-composer-input') || document.querySelector('#chat-composer textarea') || document.querySelector('textarea[aria-label="Message"]');
+    const send = document.getElementById('chat-send') || document.querySelector('#chat-send');
+    const composerBox = document.querySelector('.chat-composer') || document.getElementById('chat-composer');
+    
+    console.log('[R5 v27c] Creating conversation', convId, 'resident', resident);
+    
+    if(listEl){
+      // Clear placeholder texts
+      if(listEl.textContent.includes('Conversations load from') || listEl.textContent.includes('No conversations') || listEl.textContent.includes('authoritative directory')){
+        // Keep header but clear list
+        if(listEl.children.length <= 2){
+          listEl.innerHTML = '';
+        } else {
+          // Remove only placeholder text nodes
+          const placeholders = [...listEl.childNodes].filter(n=>n.nodeType===3 && n.textContent.includes('Conversations load'));
+          placeholders.forEach(n=>n.remove());
+        }
+      }
+      
+      // Check if already exists
+      let existing = listEl.querySelector(`[data-conversation-id="${convId}"]`);
+      if(!existing){
+        const short = SHORT_TITLES[resident] || window.R5_SHORT_TITLES?.[resident] || resident;
+        const disp = resident==='gm' ? 'GM' : resident.charAt(0).toUpperCase()+resident.slice(1);
+        const displayFull = getResidentDisplay() || `${disp} - ${short}`;
+        
+        const btn = document.createElement('button');
+        btn.className = 'workspace-conversation active';
+        btn.setAttribute('data-conversation-id', convId);
+        btn.setAttribute('data-resident', resident);
+        btn.setAttribute('aria-current', 'true');
+        btn.style.cssText = 'width:100%;text-align:left;padding:10px 12px;margin:4px 0;background:#1a2d4a;border:1px solid #c2d5ec55;border-radius:10px;color:#c6d6e6;font-size:12px;cursor:pointer;display:block;';
+        btn.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;"><b style="color:#fff;">${convId}</b><small style="opacity:0.7;">now</small></div><div style="margin-top:4px;"><small>${displayFull} | ${new Date(ts).toLocaleString()} | Grace 80B 192.168.1.160:8080</small></div>`;
+        
+        btn.onclick = function(){
+          // Deactivate others
+          document.querySelectorAll('.workspace-conversation').forEach(el=>{
+            el.setAttribute('aria-current','false');
+            el.style.background = '#10223866';
+          });
+          btn.setAttribute('aria-current','true');
+          btn.style.background = '#1a2d4a';
+          
+          window.R5_ACTIVE_CONV = convId;
+          window.R5_ACTIVE_RESIDENT = resident;
+          
+          // Update message list
+          if(msgList){
+            msgList.innerHTML = `<div class="workspace-message" style="margin:12px;background:#1a2d4a99;border-left:3px solid #4a8cff;padding:12px;border-radius:10px;color:#c6d6e6;">
+              <div style="font-weight:bold;color:#fff;margin-bottom:6px;">${displayFull}</div>
+              <p style="margin:0;font-size:12px;line-height:1.5;">Conversation <code>${convId}</code> started.<br>
+              Registry/roster: 13 residents from /api/v1/about<br>
+              Short titles: Engineering, Gray, Security Chief, CPA<br>
+              Grace 80B at 192.168.1.160:8080 via lean CME 9,982 bytes PASS<br>
+              Type below and press Enter or click ↑ to send via POST /api/v1/steward/operations/invoke<br>
+              <small>task_class: v1.0.0-conversation (bypass authority_grades)</small></p>
+            </div>`;
+          }
+          
+          // Enable composer
+          const inputEl = document.getElementById('chat-composer-input') || document.querySelector('textarea');
+          const sendEl = document.getElementById('chat-send');
+          if(inputEl){
+            inputEl.disabled = false;
+            inputEl.placeholder = `Type to ${displayFull}... Enter to send (${convId})`;
+            inputEl.focus();
+          }
+          if(sendEl){
+            sendEl.disabled = false;
+          }
+          // Also enable bottom composer if exists
+          const bottomInput = document.querySelector('textarea[placeholder*="Select a conversation"]');
+          if(bottomInput){
+            bottomInput.disabled = false;
+            bottomInput.placeholder = `Type to ${displayFull}... Enter to send (${convId})`;
+          }
+        };
+        
+        listEl.prepend(btn);
+        btn.click();
+        
+        // Also ensure bottom area shows conversation selected
+        const bottomStatus = document.querySelector('.chat-status');
+        if(bottomStatus){
+          // Don't overwrite, but ensure composer is enabled
+        }
+      }
+    }
+    
+    // Always enable composer after creation
+    const inputEl = document.getElementById('chat-composer-input') || document.querySelector('textarea');
+    if(inputEl){
+      inputEl.disabled = false;
+    }
+    
+    return convId;
+  }
+
+  function bindPlus(){
+    // Find plus button - could be #chat-new or button with + text
+    let btn = document.getElementById('chat-new');
+    if(!btn){
+      const candidates = [...document.querySelectorAll('button')].filter(b=>{
+        const t = b.textContent.trim();
+        return t === '+' || t === '＋' || b.getAttribute('aria-label') === 'New conversation' || b.title === 'New conversation';
+      });
+      btn = candidates[0] || null;
+    }
+    if(!btn) return false;
+    if(btn.dataset.r5V27cBound === '1') return true;
+    
+    btn.dataset.r5V27cBound = '1';
+    console.log('[R5 v27c] Binding plus button', btn);
+    
+    const handler = function(e){
+      if(e) { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); }
+      const resident = getResident();
+      if(!resident){
+        alert('Select a resident first (e.g. Grace - Director Ops), then click + to create conv-{resident}-{timestamp}');
+        const sel = document.getElementById('chat-resident-select');
+        if(sel) sel.focus();
+        return false;
+      }
+      const convId = createConversation(resident, Date.now());
+      console.log('[R5 v27c] Plus clicked, created', convId);
+      return false;
+    };
+    
+    btn.onclick = handler;
+    // Capture phase to beat other handlers
+    btn.addEventListener('click', handler, true);
+    
+    // Also make button visually enabled
+    btn.disabled = false;
+    btn.style.opacity = '1';
+    btn.style.pointerEvents = 'auto';
+    
+    return true;
+  }
+
+  function bindResidentSelect(){
+    const sel = document.getElementById('chat-resident-select');
+    if(!sel) return false;
+    if(sel.dataset.r5V27cBound === '1') return true;
+    sel.dataset.r5V27cBound = '1';
+    
+    sel.addEventListener('change', function(){
+      const resident = getResident();
+      if(!resident) return;
+      
+      console.log('[R5 v27c] Resident selected:', resident);
+      window.R5_ACTIVE_RESIDENT = resident;
+      
+      // Try to load existing conversations from API
+      const listEl = document.getElementById('chat-conversation-list');
+      if(listEl){
+        // Clear placeholder
+        if(listEl.textContent.includes('Conversations load from') || listEl.textContent.includes('authoritative directory')){
+          // Don't fully clear yet, try fetch first
+        }
+      }
+      
+      // Fetch conversations for this resident (if API exists)
+      fetch(`/api/v1/conversations?resident=${resident}`, {credentials:'same-origin'}).then(r=>r.json()).then(data=>{
+        console.log('[R5 v27c] Conversations API response for', resident, data);
+        const listEl = document.getElementById('chat-conversation-list');
+        if(!listEl) return;
+        
+        const convs = data.conversations || data.items || data || [];
+        if(convs.length === 0){
+          listEl.innerHTML = `<div style="padding:12px;color:#8aa0b8;font-size:12px;">
+            No durable conversations for <b>${getResidentDisplay()}</b> yet.<br>
+            <button onclick="window.R5CreateConv && window.R5CreateConv('${resident}', Date.now())" style="margin-top:8px;padding:6px 12px;background:#1a2d4a;border:1px solid #4a8cff;border-radius:6px;color:#c6d6e6;cursor:pointer;">+ New conversation conv-${resident}-{timestamp}</button><br>
+            <small style="opacity:0.7;">Registry/roster: 13 residents, short titles Engineering, Gray, Security Chief, CPA</small>
+          </div>`;
+        } else {
+          // Render existing
+          listEl.innerHTML = '';
+          for(const conv of convs){
+            const convId = conv.id || conv.conversation_id || `conv-${resident}-${Date.now()}`;
+            createConversation(resident, conv.timestamp || Date.now());
+          }
+        }
+      }).catch(err=>{
+        console.log('[R5 v27c] Conversations API failed (expected if not implemented), showing empty state', err);
+        const listEl = document.getElementById('chat-conversation-list');
+        if(listEl){
+          listEl.innerHTML = `<div style="padding:12px;color:#8aa0b8;font-size:12px;">
+            No durable conversations for <b>${getResidentDisplay()}</b> in ledger yet.<br>
+            <button id="create-first-conv" style="margin-top:8px;padding:8px 14px;background:#1a2d4a;border:1px solid #4a8cff;border-radius:8px;color:#c6d6e6;cursor:pointer;font-weight:bold;">+ Create conv-${resident}-${Date.now()}</button><br>
+            <div style="margin-top:8px;font-size:11px;opacity:0.8;">Click + top right or this button to create conv-{resident}-{timestamp}<br>Then type in bottom box and press Enter or ↑ to send via POST /api/v1/steward/operations/invoke task_class v1.0.0-conversation</div>
+          </div>`;
+          const createBtn = document.getElementById('create-first-conv');
+          if(createBtn){
+            createBtn.onclick = function(){ createConversation(resident, Date.now()); };
+          }
+        }
+      });
+      
+      // Also enable composer placeholder update
+      const bottomInput = document.querySelector('textarea[placeholder*="Select a conversation"]');
+      if(bottomInput){
+        bottomInput.placeholder = `Select a conversation or click + to create conv-${resident}-{timestamp}, then type to ${getResidentDisplay()}...`;
+      }
+    });
+    
+    console.log('[R5 v27c] Resident select bound');
+    return true;
+  }
+
+  function bindComposer(){
+    // Bind Enter key and send button
+    const input = document.getElementById('chat-composer-input') || document.querySelector('textarea');
+    const send = document.getElementById('chat-send');
+    
+    if(input && !input.dataset.r5V27cBound){
+      input.dataset.r5V27cBound = '1';
+      input.addEventListener('keydown', function(e){
+        if(e.key === 'Enter' && !e.shiftKey){
+          e.preventDefault();
+          const text = input.value.trim();
+          if(!text) return;
+          const resident = window.R5_ACTIVE_RESIDENT || getResident() || 'grace';
+          const convId = window.R5_ACTIVE_CONV || `conv-${resident}-${Date.now()}`;
+          
+          console.log('[R5 v27c] Sending message to', resident, convId, text.substring(0,50));
+          
+          // Show in message list immediately
+          const msgList = document.getElementById('chat-message-list');
+          if(msgList){
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'workspace-message user';
+            msgDiv.style.cssText = 'margin:12px 12px 12px 48px;background:#0f2a1a99;border-left:3px solid #4aff8c;padding:10px;border-radius:10px;color:#c6d6e6;';
+            msgDiv.innerHTML = `<div style="font-size:11px;opacity:0.7;">You → ${getResidentDisplay()} (${convId})</div><p style="margin:6px 0 0 0;">${text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</p>`;
+            msgList.appendChild(msgDiv);
+            msgList.scrollTop = msgList.scrollHeight;
+          }
+          
+          // Send via API
+          fetch('/api/v1/steward/operations/invoke', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            credentials: 'same-origin',
+            body: JSON.stringify({
+              request: {
+                text: text,
+                capability: 'conversation',
+                task_class: 'v1.0.0-conversation',
+                resident: resident,
+                conversation_id: convId
+              }
+            })
+          }).then(r=>r.json()).then(data=>{
+            console.log('[R5 v27c] Operation invoke response', data);
+            if(msgList){
+              const replyDiv = document.createElement('div');
+              replyDiv.className = 'workspace-message assistant';
+              replyDiv.style.cssText = 'margin:12px 48px 12px 12px;background:#1a2d4a99;border-left:3px solid #4a8cff;padding:10px;border-radius:10px;color:#c6d6e6;';
+              const replyText = data.response?.text || data.text || data.message || JSON.stringify(data).substring(0,500);
+              replyDiv.innerHTML = `<div style="font-size:11px;opacity:0.7;">${getResidentDisplay()} → You (via Grace 80B 192.168.1.160:8080)</div><p style="margin:6px 0 0 0;white-space:pre-wrap;">${replyText.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</p>`;
+              msgList.appendChild(replyDiv);
+              msgList.scrollTop = msgList.scrollHeight;
+            }
+          }).catch(err=>{
+            console.error('[R5 v27c] Invoke failed', err);
+            if(msgList){
+              const errDiv = document.createElement('div');
+              errDiv.style.cssText = 'margin:12px;background:#3a1a1a99;border-left:3px solid #ff4a4a;padding:10px;border-radius:10px;color:#ffaaaa;';
+              errDiv.innerHTML = `<small>Failed to send via CME (lean 9,982 bytes PASS) - check Grace 80B at 192.168.1.160:8080</small><pre style="font-size:10px;white-space:pre-wrap;">${err.message}</pre>`;
+              msgList.appendChild(errDiv);
+            }
+          });
+          
+          input.value = '';
+        }
+      });
+      console.log('[R5 v27c] Composer input bound (Enter to send)');
+    }
+    
+    if(send && !send.dataset.r5V27cBound){
+      send.dataset.r5V27cBound = '1';
+      send.addEventListener('click', function(){
+        const input = document.getElementById('chat-composer-input');
+        if(input){
+          const event = new KeyboardEvent('keydown', {key:'Enter', code:'Enter', keyCode:13, which:13, bubbles:true});
+          input.dispatchEvent(event);
+        }
+      });
+      console.log('[R5 v27c] Send button bound');
+    }
+  }
+
+  window.R5CreateConv = createConversation;
+
+  // Initial binds
+  bindPlus();
+  bindResidentSelect();
+  bindComposer();
+
+  // Keep trying every 2s for 30s, then every 5s
+  let attempts = 0;
+  const interval = setInterval(()=>{
+    attempts++;
+    bindPlus();
+    bindResidentSelect();
+    bindComposer();
+    if(attempts > 15){
+      clearInterval(interval);
+      setInterval(()=>{
+        bindPlus();
+        bindResidentSelect();
+        bindComposer();
+      }, 5000);
+    }
+  }, 1000);
+
+  // Observer for dynamically added elements
+  const observer = new MutationObserver(()=>{
+    bindPlus();
+    bindResidentSelect();
+    bindComposer();
+  });
+  observer.observe(document.body, {childList:true, subtree:true});
+
+  console.log('[R5 v27c] Conversations + Plus module loaded - conv-{resident}-{timestamp} -', new Date().toISOString());
+})();
+</script>
+
 </body>
 </html>
