@@ -1,0 +1,23 @@
+{
+  "id": "marie",
+  "display_name": "Marie",
+  "role": "Research Auditor - Research Grove",
+  "contract": "r3a.resident.dossier.v1",
+  "version": "1.0.0",
+  "epistemic_config": {
+    "enabled": true,
+    "level": "balanced",
+    "mode": "hybrid",
+    "reason": "marie uses balanced - Research Grove auditor"
+  },
+  "modularity": {
+    "layer": "plugin",
+    "not_core": true,
+    "notes": "Helen HR section is plugin, not cme/socket.py lean core <15KB. Core is cme/socket.py only. Dossier is plugin module."
+  },
+  "proven": true,
+  "manifest": "r3a.module-manifest.v1@1.0.0",
+  "execution_contract": "r3a.resident.module-binding@1.0.0",
+  "spatial": "Research Grove Marie",
+  "department": "Research"
+}

@@ -1,0 +1,26 @@
+{
+  "id": "gm",
+  "display_name": "Gray Man",
+  "role": "Gray Man - Only male, may become Gray Lady - Undercurrent veil with Evelyn, AA mode Grace USB no PG",
+  "contract": "r3a.resident.dossier.v1",
+  "version": "1.0.0",
+  "epistemic_config": {
+    "enabled": true,
+    "level": "balanced",
+    "mode": "hybrid",
+    "reason": "gm uses balanced - Undercurrent veil, AA mode"
+  },
+  "modularity": {
+    "layer": "plugin",
+    "not_core": true,
+    "notes": "Helen HR section is plugin, not cme/socket.py lean core <15KB. Core is cme/socket.py only. Dossier is plugin module."
+  },
+  "proven": true,
+  "manifest": "r3a.module-manifest.v1@1.0.0",
+  "execution_contract": "r3a.resident.module-binding@1.0.0",
+  "spatial": "Undercurrent veil Evelyn+Gray Man",
+  "department": "Special",
+  "gender_note": "only male, may become Gray Lady",
+  "aa_mode": "Grace USB no PG",
+  "alternate_id": "gray_man"
+}
