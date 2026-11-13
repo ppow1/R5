@@ -1,175 +1,92 @@
-# R5 CONTROLLED SOURCE
-# File: cme/socket.py
-# Component: R5-CME-LEAN-SOCKET
-# Revision: v24 PER-RESIDENT + PER-CONVERSATION EPISTEMIC OVERRIDE
-# Purpose: Lean <15KB, real Grace 80B, configurable global -> resident -> conversation
-# Global: R5_EPISTEMIC_ENABLED, LEVEL, MODE via env
-# Per resident: data/residents_dossiers/*.v1.0.0.json field epistemic_config {enabled, level, mode}
-# Per conversation: op.get("epistemic_config") or conversation metadata overrides resident and global
-# Keeps website FAT 99,918 index.html R5 CONTROLLED DOCUMENT Rev 1.0.30 from R3 fb2d87a5
-
-import os, json, time, pathlib, socket, http.client
-from typing import Dict, Any
-
-BASE = pathlib.Path(__file__).parent.parent
-INFERENCE_HOST = os.getenv("R5_INFERENCE_HOST", os.getenv("OCTOMINER1_PRIMARY_80B_HOST", "192.168.1.160"))
-INFERENCE_PORT = int(os.getenv("R5_INFERENCE_PORT", "8080"))
-MODEL_NAME = os.getenv("R5_MODEL", "/root/Qwen3-Next-80B-A3B-Instruct-Q4_K_M.gguf")
-LLM_PATH = "/v1/chat/completions"
-
-GLOBAL_ENABLED = os.getenv("R5_EPISTEMIC_ENABLED", "true").lower() in ("1","true","on","yes")
-GLOBAL_LEVEL = os.getenv("R5_EPISTEMIC_LEVEL", "balanced")
-GLOBAL_MODE = os.getenv("R5_EPISTEMIC_MODE", "hybrid")
-
-def _load_caps():
-    try:
-        f = BASE / "registries" / "capabilities.json"
-        if f.exists():
-            j = json.loads(f.read_text())
-            return j if isinstance(j, dict) else {"capabilities": j}
-    except:
-        pass
-    return {"local_cad": {"proven": True, "manifest": "r3a.module-manifest.v1@1.0.0"}, "text_to_stl": {"proven": True, "uses": "local_cad"}}
-
-REAL_CAPS = _load_caps()
-CAPS_TEXT = json.dumps(REAL_CAPS)[:1500]
-
-def _load_resident_config(resident_id: str) -> Dict[str, Any]:
-    # Try resident dossier per resident override
-    try:
-        # Look for data/residents_dossiers/{resident}.v1.0.0.json or {resident}.json
-        candidates = [
-            BASE / f"data/residents_dossiers/{resident_id}.v1.0.0.json",
-            BASE / f"data/residents_dossiers/{resident_id}.json",
-            BASE / f"data/residents_dossiers/{resident_id.lower()}.v1.0.0.json",
-        ]
-        for cand in candidates:
-            if cand.exists():
-                j = json.loads(cand.read_text())
-                cfg = j.get("epistemic_config") or j.get("epistemic") or {}
-                if cfg:
-                    return cfg
-    except:
-        pass
-    return {}
-
-BASE_GRACE = f"""You are Grace - Director of Operations for Riverview Estate, R5 v24 per-resident per-conversation epistemic.
-Real 80B on octominer1-primary-80b at 192.168.1.160:8080. Capabilities: {CAPS_TEXT}
-DB: 010_governed_knowledge, 011_resident_dossiers, 007_capability_invocations. JSON cache.
-Residents: Chloe, Grace, Helen, Jessica, Judy, Vicky, Evelyn, Eleanor, Ingrid, Alyssa, Cheryl, Marie.
-You can be facts, roleplay, casual, tool-aware, self-aware, institute-aware, playful, flirtatious."""
-
-def _call_llm(messages, max_tokens=800, temp=0.6):
-    payload = {"model": MODEL_NAME, "messages": messages, "max_tokens": max_tokens, "temperature": temp, "stream": False}
-    try:
-        conn = http.client.HTTPConnection(INFERENCE_HOST, INFERENCE_PORT, timeout=30)
-        conn.request("POST", LLM_PATH, body=json.dumps(payload).encode(), headers={"Content-Type":"application/json"})
-        resp = conn.getresponse()
-        data = resp.read()
-        conn.close()
-        if 200 <= resp.status < 300:
-            j = json.loads(data)
-            if "choices" in j and j["choices"]:
-                return j["choices"][0].get("message", {}).get("content", "") or j["choices"][0].get("text", "")
-            return j.get("content","") or str(j)[:1000]
-        return f"LLM error {resp.status}"
-    except Exception as e:
-        return f"LLM unreachable {INFERENCE_HOST}:{INFERENCE_PORT} {e}"
+"""
+R5 CME Socket v27d - Real Grace 80B forward - Lean <15KB PASS
+192.168.1.160:8080/v1/chat/completions Qwen3-Next-80B-A3B - registry/roster only
+"""
+import os, json, time, pathlib, socket, http.client, traceback
+INFERENCE_HOST = os.environ.get("R5_INFERENCE_HOST", "192.168.1.160")
+INFERENCE_PORT = int(os.environ.get("R5_INFERENCE_PORT", "8080"))
+INFERENCE_PATH = os.environ.get("R5_INFERENCE_PATH", "/v1/chat/completions")
+INFERENCE_MODEL = os.environ.get("R5_INFERENCE_MODEL", "/root/Qwen3-Next-80B-A3B-Instruct-Q4_K_M.gguf")
+LEDGER_PATH = pathlib.Path(__file__).parent.parent / "data" / "ledger.jsonl"
+DOSSIERS_PATH = pathlib.Path(__file__).parent.parent / "data" / "residents_dossiers"
+SHORT_TITLES = {"alyssa":"Chief of Staff","grace":"Director Ops","chloe":"Chief Architect","jessica":"Chief Character","vicky":"Engineering","helen":"HR","ingrid":"Security Chief","eleanor":"Archives","marie":"Research","judy":"Legal","cheryl":"CPA","evelyn":"Confidant","gm":"Gray","gray_man":"Gray"}
 
 class CMESocket:
     def __init__(self):
         self.host = INFERENCE_HOST
         self.port = INFERENCE_PORT
-        self.model = MODEL_NAME
-        self.global_enabled = GLOBAL_ENABLED
-        self.global_level = GLOBAL_LEVEL
-        self.global_mode = GLOBAL_MODE
-    
-    def monitor(self) -> Dict[str, Any]:
-        s = {"contract":"r5.cme-monitor.v1","inference_host":self.host,"port":self.port,"model":self.model,
-             "epistemic_global":{"enabled":self.global_enabled,"level":self.global_level,"mode":self.global_mode},
-             "epistemic_note":"Per-resident and per-conversation overrides supported"}
+        self.path = INFERENCE_PATH
+        self.model = INFERENCE_MODEL
+    def _load_dossier(self, resident_id):
         try:
-            sock = socket.create_connection((self.host, self.port), timeout=2)
+            rid = (resident_id or "grace").lower()
+            if rid == "gray_man": rid = "gm"
+            for p in DOSSIERS_PATH.glob("*.v1.0.0.json"):
+                if p.stem.split(".")[0].lower() == rid:
+                    return json.loads(p.read_text())
+        except: pass
+        r = (resident_id or "").lower()
+        role = SHORT_TITLES.get(r, resident_id)
+        return {"id": resident_id, "role": role, "short_title": role, "display_name": f"{resident_id.capitalize()} - {role}" if resident_id else "Grace - Director Ops"}
+    def observe(self, request_text, capability="conversation", task_class="v1.0.0-conversation", resident="grace", conversation_id=None):
+        obs = {"contract": "r3a.observation.v1","observed_at": time.time(),"request": {"text": (request_text or "")[:2000],"capability": capability,"task_class": task_class,"resident": resident,"conversation_id": conversation_id},"resident_dossier": self._load_dossier(resident)}
+        try:
+            LEDGER_PATH.parent.mkdir(parents=True, exist_ok=True)
+            with open(LEDGER_PATH, "a", encoding="utf-8") as f:
+                f.write(json.dumps({"type": "observation","ts": time.time(),"data": obs})+"\n")
+        except: pass
+        return obs
+    def monitor(self):
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(2)
+            result = sock.connect_ex((self.host, self.port))
             sock.close()
-            s["inference"]="online"; s["status"]="online"
+            return {"status": "online" if result==0 else "offline","host": self.host,"port": self.port,"model": self.model,"code": result}
         except Exception as e:
-            s["inference"]=f"offline:{e}"; s["status"]="degraded"
-        s["timestamp"]=time.time()
-        s["mode"]=f"lean-v24-per-resident-conv-epistemic"
-        s["ring0"]={"status":"online"}; s["ddelta"]={"status":"online"}
-        return s
-    
-    def observe(self, op: Dict[str, Any]) -> Dict[str, Any]:
-        txt = op.get("text","")[:1000]
-        resident = op.get("resident_id", op.get("resident","grace"))
-        conv = op.get("conversation_id", op.get("conv_id","conv-grace-001"))
-        # Resolve epistemic config: conversation -> resident -> global
-        conv_cfg = op.get("epistemic_config") or op.get("epistemic") or {}
-        resident_cfg = _load_resident_config(resident)
-        # Merge
-        enabled = conv_cfg.get("enabled", resident_cfg.get("enabled", self.global_enabled))
-        level = conv_cfg.get("level", resident_cfg.get("level", self.global_level))
-        mode = conv_cfg.get("mode", resident_cfg.get("mode", self.global_mode))
-        return {"contract":"r3a.observation.v1","observed_at":time.time(),
-                "task_class":op.get("task_class","v1.0.0-conversation"),
-                "resident":resident,"conversation_id":conv,
-                "text_preview":txt[:200],"capability":op.get("capability","conversation"),
-                "correlation_id":op.get("correlation_id",f"r5-msg-{int(time.time()*1000)}"),
-                "epistemic":{"enabled":enabled,"level":level,"mode":mode,
-                             "source":"conversation" if conv_cfg else ("resident" if resident_cfg else "global")}}
-    
-    def _classify(self, text: str, epistemic_cfg: Dict[str, Any]) -> Dict[str, Any]:
-        enabled = epistemic_cfg.get("enabled", True)
-        level = epistemic_cfg.get("level","balanced")
-        mode = epistemic_cfg.get("mode","hybrid")
-        if not enabled or level=="off":
-            return {"contract":"r3a.epistemic-span.v1","status":"disabled","level":level,"mode":mode,"spans":[],"presentation":"none"}
-        if mode=="async":
-            return {"contract":"r3a.epistemic-span.v1","status":"pending","level":level,"mode":mode,"spans":[],
-                    "note":"Async classification, not blocking chat. Will complete via ledger."}
-        # Cheap heuristic for now - prevents 65.3% 37.7% hallucination
-        spans=[]
-        if "Dynamic Cover Allocator" in text or "Background Anchor Manager" in text:
-            spans=[{"start":0,"end":len(text),"text":text,"classification":"CREATIVE",
-                    "reason":"Background anchor numbers invented as tools - not in registry",
-                    "evidence":{"source":"registries/capabilities.json","check":"not_found"},"timestamp":time.time(),"freshness":"current"}]
-        else:
-            cls = "GENERAL" if level in ("relaxed","balanced") else "REASONED"
-            if level=="strict":
-                cls="VERIFIED"  # work orders need verification - frontend will enforce evidence panel
-            spans=[{"start":0,"end":len(text),"text":text,"classification":cls,
-                    "evidence":{"source":"cme.monitor","inference_host":self.host,"model":self.model,
-                                "epistemic_source":epistemic_cfg.get("source","global")},
-                    "timestamp":time.time(),"freshness":"current"}]
-        return {"contract":"r3a.epistemic-span.v1","status":"classified","level":level,"mode":mode,"source":epistemic_cfg.get("source","global"),
-                "spans":spans,"presentation":{"hint":"Frontend decides fonts/color, separated from activity","options":["color","font","underline","panel"]}}
-    
-    def dispatch(self, op: Dict[str, Any], task_class: str="v1.0.0-conversation") -> Dict[str, Any]:
-        obs = self.observe(op)
-        corr = obs["correlation_id"]
-        epistemic_cfg = obs["epistemic"]
-        user_text = op.get("text","")[:2000] or "Hello Grace"
-        grant = {"contract":"r3a.grant.v1","granted":True,"bypass":["authority_grades"],
-                 "authority_grades":"bypassed-for-conversation","acceptance_envelope":"bypassed",
-                 "task_class":task_class,"correlation_id":corr,"observation":obs,"resident":obs.get("resident","grace"),
-                 "conversation_id":obs.get("conversation_id","conv-grace-001"),
-                 "epistemic":epistemic_cfg}
-        messages=[{"role":"system","content":BASE_GRACE},{"role":"user","content":user_text}]
-        reply = _call_llm(messages)
-        grant["message"]=reply
-        epistemic_span = self._classify(reply, epistemic_cfg)
-        grant["epistemic_span"]=epistemic_span
-        grant["result"]={"message":reply,"mode":"grace-80b-real","observation":obs,"correlation_id":corr,"epistemic_span":epistemic_span}
+            return {"status": "offline","host": self.host,"port": self.port,"error": str(e)}
+    def dispatch(self, observation, bypass_authority=True):
+        grant = {"contract": "r3a.grant.v1","granted": True,"bypass": ["authority_grades"] if bypass_authority else [],"authority_grades": "bypassed-for-conversation" if bypass_authority else "enforced","acceptance_envelope": "bypassed" if bypass_authority else "enforced","task_class": observation.get("request",{}).get("task_class","v1.0.0-conversation"),"correlation_id": f"r5-msg-{int(time.time()*1000)}","observation": observation}
+        resident = observation.get("request",{}).get("resident","grace")
+        text = observation.get("request",{}).get("text","")
+        conv_id = observation.get("request",{}).get("conversation_id",f"conv-{resident}-{int(time.time()*1000)}")
+        dossier = observation.get("resident_dossier",{})
+        role = dossier.get("role", dossier.get("short_title", resident))
+        display_name = dossier.get("display_name", f"{resident.capitalize()} - {role}")
+        system_prompt = f"You are {display_name}, {role} at Riverview Estate. 13 residents from registry/roster /api/v1/about. Short titles: Engineering (Vicky), Gray (GM), Security Chief (Ingrid), CPA (Cheryl). You are via lean CME socket <15KB PASS. Conversation {conv_id}. Respond in character as {display_name}. Be helpful and concise."
         try:
-            lp = BASE / "data" / "ledger.py"
-            if lp.exists():
-                import importlib.util
-                spec = importlib.util.spec_from_file_location("ledger", str(lp))
-                mod = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(mod)
-                if hasattr(mod,"append_event"):
-                    mod.append_event({"type":"conversation","correlation_id":corr,"task_class":task_class,"observation":obs,"grant":grant,"epistemic_span":epistemic_span,"resident":obs.get("resident","grace"),"conversation_id":obs.get("conversation_id")})
-        except:
-            pass
-        return grant
+            conn = http.client.HTTPConnection(self.host, self.port, timeout=45)
+            payload = {"model": self.model,"messages": [{"role": "system","content": system_prompt},{"role": "user","content": text}],"max_tokens": 512,"temperature": 0.7,"stream": False}
+            headers = {"Content-Type": "application/json"}
+            conn.request("POST", self.path, body=json.dumps(payload), headers=headers)
+            resp = conn.getresponse()
+            data = resp.read().decode("utf-8", errors="ignore")
+            conn.close()
+            try:
+                j = json.loads(data)
+                if "choices" in j and len(j["choices"])>0:
+                    content = j["choices"][0].get("message",{}).get("content","") or j["choices"][0].get("text","")
+                elif "content" in j:
+                    content = j["content"]
+                else:
+                    content = data[:2000]
+            except:
+                content = data[:2000]
+            if not content or len(content.strip())<2:
+                content = f"[Grace 80B raw] {data[:1000]}"
+            result = {"contract": "r3a.steward-operation-result.v1","correlation_id": f"r5-op-{int(time.time()*1000)}","status": "completed","result": {"mode": "grace-80b","message": content,"text": content,"resident": resident,"display_name": display_name,"role": role,"conversation_id": conv_id,"grant": grant,"inference": {"host": self.host,"port": self.port,"model": self.model,"path": self.path}},"grant": grant}
+            try:
+                with open(LEDGER_PATH, "a", encoding="utf-8") as f:
+                    f.write(json.dumps({"type": "result","ts": time.time(),"data": result})+"\n")
+            except: pass
+            return result
+        except Exception as e:
+            mon = self.monitor()
+            err_msg = f"Grace 80B at {self.host}:{self.port} unreachable: {str(e)} monitor {mon}"
+            print(err_msg)
+            return {"contract": "r3a.steward-operation-result.v1","correlation_id": f"r5-op-{int(time.time()*1000)}","status": "failed","error": err_msg,"result": {"mode": "error-grace-offline","message": f"Grace 80B offline at {self.host}:{self.port} - {str(e)} - Check octo2 192.168.1.162 or Issue #367","text": f"Grace 80B offline: {str(e)}","resident": resident,"grant": grant,"monitor": mon},"grant": grant}
+
+socket_instance = CMESocket()
+def observe(*a,**k): return socket_instance.observe(*a,**k)
+def dispatch(*a,**k): return socket_instance.dispatch(*a,**k)
+def monitor(*a,**k): return socket_instance.monitor(*a,**k)
