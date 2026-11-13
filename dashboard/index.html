@@ -816,393 +816,34 @@ refreshEngineeringStatus();
 </script>
 
 
-<script id="r5-chat-dynamic-residents-v23">
-/* R5 v23 Chat: dynamic residents from /api/v1/about + conv-{resident}-{timestamp} */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script id="r5-registry-roster-v27b-final">
+/* R5 v27b FINAL - SINGLE SOURCE - NO BOUNCE - registry/roster only */
 (function(){
-  const ABOUT_ENDPOINT = '/api/v1/about';
-  const SELECT_ID = 'chat-resident-select';
-  const NEW_BTN_ID = 'chat-new';
-  const LIST_ID = 'chat-conversation-list';
-  const STATUS_ID = 'chat-service-status';
+  // Kill any previous intervals/observers
+  if(window._r5DropdownInterval) clearInterval(window._r5DropdownInterval);
+  if(window._r5RegistryInterval) clearInterval(window._r5RegistryInterval);
   
-  function logStatus(msg){
-    const el = document.getElementById(STATUS_ID);
-    if(el) el.textContent = msg;
-    console.log('[R5 Chat]', msg);
-  }
-
-  async function loadResidents(){
-    const select = document.getElementById(SELECT_ID);
-    if(!select) return;
-    try{
-      const r = await fetch(ABOUT_ENDPOINT, {credentials:'same-origin', cache:'no-store'});
-      if(!r.ok) throw new Error('HTTP '+r.status);
-      const about = await r.json();
-      const dossiers = about.residents_dossiers || about.residents || {};
-      // dossiers is dict key->meta or file name -> extract ids
-      let ids = [];
-      if(Array.isArray(dossiers)){
-        ids = dossiers;
-      } else {
-        // keys like "alyssa.v1.0.0" or "grace" -> extract id
-        for(const key of Object.keys(dossiers)){
-          // try to get id from value
-          const val = dossiers[key];
-          if(typeof val === 'string'){
-            // val might be id
-            ids.push(val.replace('.v1.0.0','').replace('.json',''));
-          } else if(val && val.id){
-            ids.push(val.id);
-          } else {
-            // key is filename
-            let id = key.replace('.v1.0.0','').replace('.json','');
-            // normalize gray_man -> gm
-            if(id==='gray_man') id='gm';
-            ids.push(id);
-          }
-        }
-      }
-      // Dedupe, normalize, sort
-      ids = [...new Set(ids.map(s=>s.toLowerCase().trim()).filter(Boolean))];
-      // Ensure gm not duplicated with gray_man
-      if(ids.includes('gray_man') && ids.includes('gm')){
-        ids = ids.filter(x=>x!=='gray_man');
-      }
-      ids.sort();
-      console.log('[R5 Chat] Loaded residents', ids);
-      
-      // Save for global use
-      window.R5_RESIDENTS = ids;
-      
-      // Rebuild select options preserving selected
-      const current = select.value;
-      select.innerHTML = '<option value="">Select a resident...</option>';
-      ids.forEach(id=>{
-        const opt = document.createElement('option');
-        opt.value = id;
-        // Display name capitalized, special case gm -> Gray
-        let display = id.charAt(0).toUpperCase() + id.slice(1);
-        if(id==='gm') display='Gray (GM)';
-        if(id==='alyssa') display='Alyssa - Chief of Staff';
-        if(id==='cheryl') display='Cheryl - Comptroller';
-        if(id==='ingrid') display='Ingrid - Guardian';
-        if(id==='marie') display='Marie - Research';
-        if(id==='eleanor') display='Eleanor - Archives';
-        if(id==='evelyn') display='Evelyn - Personal';
-        if(id==='grace') display='Grace - Director Ops #1';
-        if(id==='chloe') display='Chloe - Chief Architect';
-        if(id==='jessica') display='Jessica - Character Architect';
-        if(id==='vicky') display='Vicky - Engineering';
-        if(id==='helen') display='Helen - HR';
-        if(id==='judy') display='Judy - Legal';
-        opt.textContent = display;
-        select.appendChild(opt);
-      });
-      if(current && ids.includes(current)){
-        select.value = current;
-      }
-      logStatus(`Residents loaded: ${ids.length} (13+self) from /api/v1/about - ${ids.join(', ')}`);
-      return ids;
-    }catch(e){
-      console.error('[R5 Chat] Failed to load residents', e);
-      logStatus('Failed to load residents from /api/v1/about: '+e.message+' - using hardcoded 8');
-      // Keep existing hardcoded as fallback
-      return [];
-    }
-  }
-
-  function createNewConversation(){
-    const select = document.getElementById(SELECT_ID);
-    const list = document.getElementById(LIST_ID);
-    if(!select){
-      logStatus('No resident select found');
-      return;
-    }
-    const resident = (select.value || '').trim().toLowerCase();
-    if(!resident){
-      logStatus('Select a resident first to create conversation');
-      // Flash the select
-      select.style.borderColor = '#ff6b6b';
-      setTimeout(()=>select.style.borderColor='#c2d5ec33', 1000);
-      alert('Select a resident first (e.g. Grace, Alyssa, Vicky...) then click +');
-      return;
-    }
-    const timestamp = Date.now();
-    const convId = `conv-${resident}-${timestamp}`;
-    console.log('[R5 Chat] Creating new conversation', convId);
-    
-    // Try to use authoritative API if available, otherwise create local UI entry
-    // The dashboard may have a function to create conversation via steward API
-    // We will attempt POST /api/v1/steward/operations/invoke or similar, but fallback to local
-    
-    // Create UI element immediately
-    if(list){
-      const btn = document.createElement('button');
-      btn.className = 'workspace-conversation';
-      btn.dataset.conversationId = convId;
-      btn.dataset.resident = resident;
-      btn.innerHTML = `<b>${convId}</b><br><small>Resident: ${resident} | ${new Date(timestamp).toLocaleString()}</small>`;
-      btn.addEventListener('click', ()=>{
-        // Select this conversation
-        document.querySelectorAll('.workspace-conversation').forEach(el=>el.setAttribute('aria-current','false'));
-        btn.setAttribute('aria-current','true');
-        const msgList = document.getElementById('chat-message-list');
-        if(msgList) msgList.innerHTML = `<div class="workspace-message"><b>${resident}</b><p>New conversation ${convId} started. Grace 80B at 192.168.1.160:8080 via lean CME socket.</p></div>`;
-        // Enable composer
-        const input = document.getElementById('chat-composer-input');
-        const send = document.getElementById('chat-send');
-        if(input){ input.disabled=false; input.placeholder=`Message ${resident} in ${convId}...`; input.focus(); }
-        if(send) send.disabled=false;
-        // Store active conversation
-        window.R5_ACTIVE_CONV = convId;
-        window.R5_ACTIVE_RESIDENT = resident;
-      });
-      list.prepend(btn);
-      // Auto-click it
-      btn.click();
-      logStatus(`New conversation created: ${convId} with ${resident} - conv-{resident}-{timestamp} pattern`);
-    }
-    
-    // Also try to persist via API if endpoint exists (non-blocking)
-    (async()=>{
-      try{
-        // Try steward conversation API - best effort
-        const payload = { contract: 'r3a.conversation.create.v1', resident_id: resident, conversation_id: convId };
-        const res = await fetch('/api/v1/steward/conversations', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify(payload)
-        });
-        if(res.ok){
-          console.log('[R5 Chat] Conversation persisted via API');
-        } else {
-          console.log('[R5 Chat] No persistence API, using local only (status', res.status, ')');
-        }
-      }catch(e){
-        console.log('[R5 Chat] Persistence failed (expected if no API), local only', e.message);
-      }
-    })();
-  }
-
-  function attachHandlers(){
-    const newBtn = document.getElementById(NEW_BTN_ID);
-    if(newBtn && !newBtn.dataset.r5ChatBound){
-      newBtn.dataset.r5ChatBound='1';
-      newBtn.addEventListener('click', (e)=>{
-        e.preventDefault();
-        e.stopPropagation();
-        createNewConversation();
-      });
-      console.log('[R5 Chat] + button bound to conv-{resident}-{timestamp}');
-    }
-  }
-
-  // Load residents on start and attach handlers
-  loadResidents();
-  attachHandlers();
-  setInterval(attachHandlers, 2000);
-  // Reload residents every 30s in case new dossiers added
-  setInterval(loadResidents, 30000);
-  
-  window.R5_CHAT = { loadResidents, createNewConversation, attachHandlers };
-})();
-</script>
-
-
-<script id="r5-chat-persistent-friendly-v24">
-/* R5 v24 Chat: persistent friendly resident names, overrides steward-workspace-api.mjs */
-(function(){
-  const SELECT_ID = 'chat-resident-select';
-  const ABOUT_ENDPOINT = '/api/v1/about';
-  
-  const FRIENDLY_NAMES = {
-    '__REMOVED_BLOAT_MAP__': '__REMOVED__'
-  };
-
-  async function loadFriendlyResidents(){
-    const select = document.getElementById(SELECT_ID);
-    if(!select) return;
-    try{
-      const r = await fetch(ABOUT_ENDPOINT, {credentials:'same-origin', cache:'no-store'});
-      if(!r.ok) throw new Error('HTTP '+r.status);
-      const about = await r.json();
-      const dossiers = about.residents_dossiers || {};
-      let ids = [];
-      for(const key of Object.keys(dossiers)){
-        let id = key.replace('.v1.0.0','').replace('.json','');
-        if(id==='gray_man') id='gm';
-        if(!ids.includes(id)) ids.push(id);
-      }
-      ids = [...new Set(ids)].sort();
-      // Ensure we have all 13
-      const expected = ['alyssa','cheryl','chloe','eleanor','evelyn','gm','grace','helen','ingrid','jessica','judy','marie','vicky'];
-      expected.forEach(e=>{ if(!ids.includes(e)) ids.push(e); });
-      ids.sort();
-      
-      const current = select.value;
-      // Only rebuild if count mismatch or contains ".v1.0.0" pattern (old style)
-      const hasOldStyle = Array.from(select.options).some(o=>o.textContent.includes('.v1.0.0') || o.textContent.includes('(balanced)'));
-      const countMismatch = select.options.length !== (ids.length + 1);
-      
-      if(hasOldStyle || countMismatch || window.R5_FORCE_REBUILD){
-        console.log('[R5 Chat v24] Rebuilding dropdown with friendly names, oldStyle:', hasOldStyle, 'countMismatch:', countMismatch);
-        select.innerHTML = '<option value="">Select a resident...</option>';
-        ids.forEach(id=>{
-          const opt = document.createElement('option');
-          opt.value = id;
-          opt.textContent = FRIENDLY_NAMES[id] || (id.charAt(0).toUpperCase()+id.slice(1));
-          // Add epistemic level as data attribute for tooltip
-          const dossier = dossiers[id+'.v1.0.0'] || dossiers[id] || {};
-          if(dossier.epistemic_config){
-            opt.title = `Level: ${dossier.epistemic_config.level} | Mode: ${dossier.epistemic_config.mode}`;
-          }
-          select.appendChild(opt);
-        });
-        if(current && ids.includes(current)){
-          select.value = current;
-        }
-        // Update placeholder to match selected resident
-        updatePlaceholder();
-        window.R5_FORCE_REBUILD = false;
-      }
-      window.R5_RESIDENTS_FRIENDLY = ids;
-    }catch(e){
-      console.error('[R5 Chat v24] Failed', e);
-    }
-  }
-
-  function updatePlaceholder(){
-    const select = document.getElementById(SELECT_ID);
-    const input = document.getElementById('chat-composer-input');
-    if(!select || !input) return;
-    const resident = select.value || 'Grace';
-    const display = FRIENDLY_NAMES[resident] || resident;
-    input.placeholder = `Type to ${display}... Enter to send (conv-${resident}-{timestamp})`;
-  }
-
-  function attachSelectListener(){
-    const select = document.getElementById(SELECT_ID);
-    if(!select || select.dataset.r5FriendlyBound) return;
-    select.dataset.r5FriendlyBound = '1';
-    select.addEventListener('change', ()=>{
-      updatePlaceholder();
-      console.log('[R5 Chat v24] Resident changed to', select.value);
-    });
-  }
-
-  // Use MutationObserver to catch steward-workspace-api.mjs overwriting select
-  function observeSelect(){
-    const select = document.getElementById(SELECT_ID);
-    if(!select) return;
-    const observer = new MutationObserver((mutations)=>{
-      for(const m of mutations){
-        if(m.type === 'childList'){
-          // Check if old style reappeared
-          const hasOld = Array.from(select.options).some(o=>o.textContent.includes('.v1.0.0'));
-          if(hasOld){
-            console.log('[R5 Chat v24] Detected old style overwrite, rebuilding');
-            window.R5_FORCE_REBUILD = true;
-            setTimeout(loadFriendlyResidents, 100);
-          }
-        }
-      }
-    });
-    observer.observe(select, { childList: true, subtree: false });
-  }
-
-  // Initial load
-  loadFriendlyResidents();
-  attachSelectListener();
-  observeSelect();
-  
-  // Persistent checks: every 1s for first 30s, then every 5s
-  let checks = 0;
-  const interval = setInterval(()=>{
-    checks++;
-    loadFriendlyResidents();
-    attachSelectListener();
-    if(checks>30) {
-      clearInterval(interval);
-      setInterval(loadFriendlyResidents, 5000);
-    }
-  }, 1000);
-
-  // Also hook + button to ensure conv-{resident}-{timestamp} creates even when no convs returned
-  function ensurePlusButtonCreates(){
-    const newBtn = document.getElementById('chat-new');
-    const list = document.getElementById('chat-conversation-list');
-    if(!newBtn || newBtn.dataset.r5PlusV24Bound) return;
-    newBtn.dataset.r5PlusV24Bound = '1';
-    // Remove old listeners by cloning
-    const clone = newBtn.cloneNode(true);
-    newBtn.parentNode.replaceChild(clone, newBtn);
-    clone.addEventListener('click', (e)=>{
-      e.preventDefault();
-      const select = document.getElementById(SELECT_ID);
-      const resident = (select?.value || 'grace').toLowerCase();
-      if(!select?.value){
-        alert('Select a resident first: '+ (window.R5_RESIDENTS_FRIENDLY||[]).join(', '));
-        return;
-      }
-      const ts = Date.now();
-      const convId = `conv-${resident}-${ts}`;
-      console.log('[R5 Chat v24] + creating', convId);
-      const listEl = document.getElementById('chat-conversation-list');
-      if(listEl){
-        // Clear "No conversations returned" text if present
-        if(listEl.textContent.includes('No conversations returned')){
-          listEl.innerHTML = '';
-        }
-        const btn = document.createElement('button');
-        btn.className = 'workspace-conversation';
-        btn.dataset.conversationId = convId;
-        btn.innerHTML = `<b>${convId}</b><br><small>Resident: ${resident} | ${new Date(ts).toLocaleString()}</small>`;
-        btn.addEventListener('click', ()=>{
-          document.querySelectorAll('.workspace-conversation').forEach(el=>el.setAttribute('aria-current','false'));
-          btn.setAttribute('aria-current','true');
-          const msgList = document.getElementById('chat-message-list');
-          if(msgList) msgList.innerHTML = `<div class="workspace-message"><b>${resident}</b><p>New conversation ${convId} - Grace 80B at 192.168.1.160:8080 via lean CME 9982 bytes PASS. Type below and Enter to send.</p></div>`;
-          const input = document.getElementById('chat-composer-input');
-          const send = document.getElementById('chat-send');
-          if(input){ input.disabled=false; input.focus(); updatePlaceholder(); }
-          if(send) send.disabled=false;
-          window.R5_ACTIVE_CONV = convId;
-          window.R5_ACTIVE_RESIDENT = resident;
-        });
-        listEl.prepend(btn);
-        btn.click();
-      }
-    });
-    console.log('[R5 Chat v24] + button persistent bound');
-  }
-  ensurePlusButtonCreates();
-  setInterval(ensurePlusButtonCreates, 2000);
-
-  window.R5_CHAT_V24 = { loadFriendlyResidents, updatePlaceholder };
-})();
-</script>
-
-
-
-
-
-
-
-
-<script id="r5-registry-roster-v27">
-/* R5 v27 - REGISTRY/ROSTER ONLY - NO HARDCODED RESIDENTS OR INCIDENTS
-   - Residents, short titles, dossiers, incidents all from GET /api/v1/about
-   - Dropdown, plus button, incidents, chat all use registry
-   - Server /api/v1/about is authoritative: residents_dossiers + short_titles
-*/
-(function(){
   window.R5_REGISTRY = null;
-  window.R5_REGISTRY_INCIDENTS = [];
-  window.R5_RESIDENTS_SHORT = [];
-  window.R5_SHORT_TITLES = {};
+  window.R5_DROPDOWN_LOCK = false;
+  window.R5_DROPDOWN_LAST_BUILD = 0;
+  window.R5_DROPDOWN_BUILD_COUNT = 0;
 
-  const FALLBACK_SHORT = {
+  const SHORT_TITLES = {
     "alyssa": "Chief of Staff",
     "grace": "Director Ops",
     "chloe": "Chief Architect",
@@ -1220,156 +861,104 @@ refreshEngineeringStatus();
     "self": "Self"
   };
 
-  function cleanDisplay(s){
-    if(!s) return "";
-    return s.replace(/\(\s*\)/g,"").replace(/\s*#\d+/g,"").replace(/\s*\(GM\)\s*-\s*/gi," - ")
-      .replace(/Gray \(GM\)/gi,"GM - Gray").replace(/Comptroller/gi,"").replace(/Guardian.*Firewall/gi,"Security Chief")
-      .replace(/\(Firewall\)/gi,"").replace(/Only male/gi,"").replace(/Great Courtyard/gi,"").replace(/Foundry.*/gi,"Engineering")
-      .replace(/\s{2,}/g," ").trim();
-  }
+  function clean(s){ return (s||"").replace(/\(\s*\)/g,"").replace(/\s*#\d+/g,"").trim(); }
 
-  function displayName(id, serverDisplay, shortTitles){
+  function displayName(id, serverDisplay){
     id = (id||"").toLowerCase();
     if(id==="gray_man") id="gm";
-    const short = (shortTitles && shortTitles[id]) || FALLBACK_SHORT[id] || id;
+    const short = SHORT_TITLES[id] || id;
     if(serverDisplay){
-      const c = cleanDisplay(serverDisplay);
-      if(c && c.length < 60 && !c.includes("()") && !c.toLowerCase().includes("only male") && !c.toLowerCase().includes("comptroller") && !c.toLowerCase().includes("guardian")){
-        // If already in form "X - Y", keep as is if Y matches short or is short
-        return c;
-      }
+      const c = clean(serverDisplay);
+      // If server already gives "Name - Title" and title matches short, use it
+      if(c && c.includes(" - ") && c.length < 80) return c;
     }
     const cap = id==="gm" ? "GM" : id.charAt(0).toUpperCase()+id.slice(1);
     return `${cap} - ${short}`;
   }
 
-  async function fetchRegistry(){
+  async function fetchRegistryAndBuild(){
+    // Prevent re-entry bounce
+    if(window.R5_DROPDOWN_LOCK) return;
+    const now = Date.now();
+    if(now - window.R5_DROPDOWN_LAST_BUILD < 3000) return; // debounce 3s
+    
+    window.R5_DROPDOWN_LOCK = true;
     try{
-      const r = await fetch('/api/v1/about', {credentials:'same-origin'});
+      const r = await fetch('/api/v1/about', {credentials:'same-origin', cache:'no-store'});
       const data = await r.json();
       window.R5_REGISTRY = data;
-      window.R5_REGISTRY_INCIDENTS = data.incidents || data.registry?.incidents || data.roster?.incidents || [];
-      window.R5_SHORT_TITLES = data.short_titles || FALLBACK_SHORT;
-      
-      console.log('[R5 v27] Registry loaded:', {
-        residents: Object.keys(data.residents_dossiers||{}).length,
-        incidents: window.R5_REGISTRY_INCIDENTS.length,
-        short_titles: Object.keys(window.R5_SHORT_TITLES).length,
-        version: data.version
-      });
-      
-      // Build residents list from dossiers - single source of truth
       const dossiers = data.residents_dossiers || {};
+      const shortMap = data.short_titles || SHORT_TITLES;
+      
       const list = [];
       const seen = new Set();
       for(const k in dossiers){
         const d = dossiers[k];
         if(!d || !d.id) continue;
-        const id = (d.id||'').toLowerCase() === 'gray_man' ? 'gm' : (d.id||'').toLowerCase();
-        if(seen.has(id)) continue;
-        if(id==='self') continue; // don't show self in dropdown
+        let id = (d.id||'').toLowerCase();
+        if(id==="gray_man") id="gm";
+        if(seen.has(id) || id==="self") continue;
         seen.add(id);
         list.push({
           id,
-          display_name: displayName(id, d.display_name, window.R5_SHORT_TITLES),
-          role: d.role || window.R5_SHORT_TITLES[id] || id,
-          short_title: d.short_title || window.R5_SHORT_TITLES[id] || id,
+          display_name: displayName(id, d.display_name),
+          role: shortMap[id] || SHORT_TITLES[id] || id,
+          short_title: shortMap[id] || SHORT_TITLES[id] || id,
           level: d.level || 'balanced'
         });
       }
-      // Ensure roster completeness from server residents_list if provided
-      const rosterFromServer = data.residents_list || [];
-      for(const ridRaw of rosterFromServer){
-        const rid = (ridRaw||'').toLowerCase()==='gray_man'?'gm':(ridRaw||'').toLowerCase();
-        if(!rid || rid==='self' || seen.has(rid)) continue;
+      // Ensure roster from server
+      const roster = data.residents_list || Object.keys(SHORT_TITLES).filter(k=>k!=='self' && k!=='gray_man');
+      for(const ridRaw of roster){
+        let rid = (ridRaw||'').toLowerCase();
+        if(rid==="gray_man") rid="gm";
+        if(!rid || rid==="self" || seen.has(rid)) continue;
         seen.add(rid);
-        list.push({
-          id: rid,
-          display_name: displayName(rid, null, window.R5_SHORT_TITLES),
-          role: window.R5_SHORT_TITLES[rid] || rid,
-          short_title: window.R5_SHORT_TITLES[rid] || rid,
-          level: 'balanced'
-        });
+        list.push({id: rid, display_name: displayName(rid, null), role: shortMap[rid]||SHORT_TITLES[rid]||rid, short_title: shortMap[rid]||SHORT_TITLES[rid]||rid, level: 'balanced'});
       }
-      
       list.sort((a,b)=>a.display_name.localeCompare(b.display_name));
-      window.R5_RESIDENTS_SHORT = list;
       
-      rebuildDropdown(list);
-      rebuildIncidents(window.R5_REGISTRY_INCIDENTS, data);
+      // Only rebuild if actually different
+      const sel = document.getElementById('chat-resident-select');
+      if(!sel) { window.R5_DROPDOWN_LOCK = false; return; }
       
-      return data;
+      const currentOptions = [...sel.options].map(o=>o.textContent).join('|');
+      const newOptions = ['Select a resident...', ...list.map(r=>r.display_name)].join('|');
+      
+      if(currentOptions !== newOptions || list.length !== (sel.options.length-1)){
+        console.log('[R5 v27b] Building dropdown from registry -', list.length, 'residents');
+        const curVal = sel.value;
+        sel.innerHTML = '<option value="">Select a resident...</option>';
+        for(const r of list){
+          const opt = document.createElement('option');
+          opt.value = r.id;
+          opt.textContent = r.display_name; // e.g. "Cheryl - CPA", "GM - Gray", "Ingrid - Security Chief", "Vicky - Engineering"
+          opt.dataset.level = r.level;
+          opt.dataset.role = r.role;
+          opt.dataset.short = r.short_title;
+          sel.appendChild(opt);
+        }
+        if(curVal && [...sel.options].some(o=>o.value===curVal)){
+          sel.value = curVal;
+        }
+        window.R5_RESIDENTS_SHORT = list;
+        window.R5_SHORT_TITLES = shortMap;
+        window.R5_DROPDOWN_LAST_BUILD = now;
+        window.R5_DROPDOWN_BUILD_COUNT++;
+        
+        const status = document.getElementById('chat-service-status');
+        if(status){
+          status.textContent = `Resident directory: ${list.length} residents from registry/roster - ready (build #${window.R5_DROPDOWN_BUILD_COUNT})`;
+        }
+      }
     }catch(e){
-      console.error('[R5 v27] Failed to fetch registry', e);
-      // Fallback from short titles only - still not hardcoded incidents, just registry fallback
-      const list = Object.keys(FALLBACK_SHORT).filter(k=>k!=='self' && k!=='gray_man').map(id=>({
-        id, display_name: displayName(id, null, FALLBACK_SHORT), role: FALLBACK_SHORT[id], short_title: FALLBACK_SHORT[id], level: 'balanced'
-      })).sort((a,b)=>a.display_name.localeCompare(b.display_name));
-      window.R5_RESIDENTS_SHORT = list;
-      rebuildDropdown(list);
-      rebuildIncidents([], null);
-      return null;
+      console.error('[R5 v27b] fetch failed', e);
+    }finally{
+      window.R5_DROPDOWN_LOCK = false;
     }
   }
 
-  function rebuildDropdown(residents){
-    const sel = document.getElementById('chat-resident-select');
-    if(!sel) return;
-    const cur = sel.value;
-    sel.innerHTML = '<option value="">Select a resident...</option>';
-    for(const r of residents){
-      const opt = document.createElement('option');
-      opt.value = r.id;
-      opt.textContent = r.display_name; // e.g. "Cheryl - CPA", "GM - Gray", "Ingrid - Security Chief", "Vicky - Engineering"
-      opt.dataset.level = r.level;
-      opt.dataset.role = r.role;
-      opt.dataset.short = r.short_title;
-      sel.appendChild(opt);
-    }
-    if(cur && [...sel.options].some(o=>o.value===cur)) sel.value = cur;
-    const status = document.getElementById('chat-service-status');
-    if(status){
-      status.textContent = `Resident directory: ${residents.length} residents from registry/roster (/api/v1/about) - ${residents.map(r=>r.display_name).join(', ')}`;
-    }
-    console.log('[R5 v27] Dropdown rebuilt from registry:', residents.map(r=>r.display_name).join(', '));
-  }
-
-  function rebuildIncidents(incidents, registry){
-    // Incidents panel - if exists, populate from registry, not hardcoded
-    // Look for common incident containers
-    const containers = [
-      document.getElementById('incidents-list'),
-      document.getElementById('incident-list'),
-      document.querySelector('.incidents-list'),
-      document.querySelector('[data-incidents]')
-    ].filter(Boolean);
-    
-    // Also update any window-level incidents store
-    if(incidents && incidents.length>0){
-      window.R5_INCIDENTS = incidents;
-      console.log('[R5 v27] Incidents from registry:', incidents.length);
-      for(const c of containers){
-        c.innerHTML = '';
-        for(const inc of incidents){
-          const el = document.createElement('div');
-          el.className = 'incident-item';
-          el.textContent = typeof inc === 'string' ? inc : (inc.title || inc.id || JSON.stringify(inc));
-          c.appendChild(el);
-        }
-      }
-    } else {
-      // No incidents in registry - clear any hardcoded ones
-      for(const c of containers){
-        if(c && c.children.length>0){
-          // If container had hardcoded content, clear it to show registry is empty
-          console.log('[R5 v27] Clearing hardcoded incidents, registry has 0 incidents');
-          c.innerHTML = '<div class="muted">No incidents in registry/roster - incidents come from /api/v1/about</div>';
-        }
-      }
-    }
-  }
-
-  // Plus button - conv-{resident}-{timestamp} - uses registry
+  // Plus button - single instance with lock
   function getSelectedResident(){
     const sel = document.getElementById('chat-resident-select');
     let v = (sel?.value||'grace').toLowerCase().trim();
@@ -1390,19 +979,19 @@ refreshEngineeringStatus();
       }
       let existing = listEl.querySelector(`[data-conversation-id="${convId}"]`);
       if(!existing){
-        const short = (window.R5_SHORT_TITLES && window.R5_SHORT_TITLES[resident]) || FALLBACK_SHORT[resident] || resident;
+        const short = (window.R5_SHORT_TITLES && window.R5_SHORT_TITLES[resident]) || SHORT_TITLES[resident] || resident;
         const disp = resident==='gm' ? 'GM' : resident.charAt(0).toUpperCase()+resident.slice(1);
         const btn = document.createElement('button');
         btn.className='workspace-conversation';
         btn.setAttribute('data-conversation-id', convId);
         btn.setAttribute('data-resident', resident);
         btn.style.cssText='width:100%;text-align:left;padding:8px;margin:3px 0;background:#10223866;border:1px solid #c2d5ec33;border-radius:8px;color:#c6d6e6;font-size:11px;cursor:pointer;';
-        btn.innerHTML=`<b>${convId}</b><br><small>${disp} - ${short} | ${new Date(ts).toLocaleString()} | registry/roster</small>`;
+        btn.innerHTML=`<b>${convId}</b><br><small>${disp} - ${short} | ${new Date(ts).toLocaleString()} | registry/roster v27b</small>`;
         btn.onclick = function(){
           document.querySelectorAll('.workspace-conversation').forEach(el=>el.setAttribute('aria-current','false'));
           btn.setAttribute('aria-current','true');
           if(msgList){
-            msgList.innerHTML=`<div class="workspace-message" style="margin-left:24px;background:#1a2d4a99;border-left:3px solid #c2d5ec44;padding:9px;border-radius:9px;"><b>${disp} - ${short}</b><p>Conversation ${convId} from registry/roster. Grace 80B 192.168.1.160:8080 via lean CME 9982 bytes PASS. Uses /api/v1/about for residents_dossiers. Type below and press Enter or ↑ to send via POST /api/v1/steward/operations/invoke task_class v1.0.0-conversation.</p></div>`;
+            msgList.innerHTML=`<div class="workspace-message" style="margin-left:24px;background:#1a2d4a99;border-left:3px solid #c2d5ec44;padding:9px;border-radius:9px;"><b>${disp} - ${short}</b><p>Conversation ${convId} from registry/roster v27b. Short titles: Engineering, Gray, Security Chief, CPA. Type below and press Enter or ↑.</p></div>`;
           }
           if(input){ input.disabled=false; input.placeholder=`Type to ${disp} - ${short}...`; input.focus(); }
           if(send) send.disabled=false;
@@ -1423,8 +1012,8 @@ refreshEngineeringStatus();
       }
     }
     if(!btn) return false;
-    if(btn.dataset.r5V27Bound==='1') return true;
-    btn.dataset.r5V27Bound='1';
+    if(btn.dataset.r5V27bBound==='1') return true;
+    btn.dataset.r5V27bBound='1';
     const handler = function(e){
       e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
       createConversation(getSelectedResident(), Date.now());
@@ -1432,38 +1021,44 @@ refreshEngineeringStatus();
     };
     btn.onclick = handler;
     btn.addEventListener('click', handler, true);
+    console.log('[R5 v27b] Plus button bound');
     return true;
   }
 
   window.R5CreateConv = createConversation;
-  window.R5_FETCH_REGISTRY = fetchRegistry;
+  window.R5_FETCH_REGISTRY = fetchRegistryAndBuild;
 
-  // Initial load
-  fetchRegistry();
+  // Initial
+  fetchRegistryAndBuild();
   bindPlus();
 
-  // Keep registry fresh and enforce no hardcode
-  let attempts=0;
-  const fast = setInterval(()=>{ attempts++; fetchRegistry(); bindPlus(); if(attempts>10){ clearInterval(fast); setInterval(()=>{ fetchRegistry(); bindPlus(); }, 10000); } }, 2000);
-
-  const obs = new MutationObserver(()=>{
-    const sel = document.getElementById('chat-resident-select');
-    // If dropdown was overwritten by hardcoded list (<10 residents or contains bloat), restore from registry
-    if(sel){
-      const hasBloat = [...sel.options].some(o=>o.textContent.includes('()') || o.textContent.includes('Only male') || o.textContent.includes('Comptroller') || o.textContent.includes('Guardian'));
-      if(sel.options.length < 10 || hasBloat){
-        if(window.R5_RESIDENTS_SHORT && window.R5_RESIDENTS_SHORT.length>0){
-          rebuildDropdown(window.R5_RESIDENTS_SHORT);
-        } else {
-          fetchRegistry();
-        }
-      }
-    }
+  // Single interval, not multiple fighting intervals
+  window._r5DropdownInterval = setInterval(()=>{
+    fetchRegistryAndBuild();
     bindPlus();
-  });
-  obs.observe(document.body, {childList:true, subtree:true});
+  }, 10000); // every 10s, not 2s
 
-  console.log('[R5 v27] Registry/Roster module loaded - NO HARDCODED RESIDENTS OR INCIDENTS - all from /api/v1/about');
+  // Single observer with debounce, only if dropdown is actually wrong
+  let observerTimeout = null;
+  const observer = new MutationObserver(()=>{
+    if(observerTimeout) clearTimeout(observerTimeout);
+    observerTimeout = setTimeout(()=>{
+      const sel = document.getElementById('chat-resident-select');
+      if(!sel) return;
+      // Only rebuild if dropdown has <5 options or has bloat like () or Only male or Comptroller
+      const hasBloat = [...sel.options].some(o=>o.textContent.includes('()') || o.textContent.includes('Only male') || o.textContent.includes('Comptroller') || o.textContent.includes('Guardian'));
+      const tooFew = sel.options.length < 6;
+      const hasShortOnly = [...sel.options].some(o=>o.textContent==='Alyssa' || o.textContent==='Cheryl') && !([...sel.options].some(o=>o.textContent.includes(' - ')));
+      if(hasBloat || tooFew || hasShortOnly){
+        console.log('[R5 v27b] Detected bad dropdown, rebuilding from registry', {hasBloat, tooFew, hasShortOnly, count: sel.options.length});
+        fetchRegistryAndBuild();
+      }
+      bindPlus();
+    }, 1000);
+  });
+  observer.observe(document.body, {childList:true, subtree:true});
+
+  console.log('[R5 v27b FINAL] Single source registry/roster - no bounce -', new Date().toISOString());
 })();
 </script>
 

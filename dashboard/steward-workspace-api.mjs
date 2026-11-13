@@ -1,3 +1,5 @@
+// v27b guard - if v27b final exists, let it handle dropdown
+if(typeof window!=="undefined" && window.R5_DROPDOWN_LAST_BUILD){ console.log("[steward-workspace-api] v27b final exists, skipping own dropdown rebuild"); } else {
 /*
 R3 CONTROLLED SOURCE
 File: web/steward-workspace-api.js
@@ -709,3 +711,5 @@ if (typeof document !== 'undefined') {
     }
     setTimeout(loadAllResidents, 500);
     setInterval(loadAllResidents, 10000);
+
+}
