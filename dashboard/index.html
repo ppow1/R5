@@ -1490,7 +1490,7 @@ refreshEngineeringStatus();
               const replyDiv = document.createElement('div');
               replyDiv.className = 'workspace-message assistant';
               replyDiv.style.cssText = 'margin:12px 48px 12px 12px;background:#1a2d4a99;border-left:3px solid #4a8cff;padding:10px;border-radius:10px;color:#c6d6e6;';
-              const replyText = data.response?.text || data.text || data.message || JSON.stringify(data).substring(0,500);
+              const replyText = data.result?.message || data.result?.text || data.response?.text || data.result?.result?.message || data.text || data.message || (function(){try{let m=data.result?.message||''; if(typeof m==='string' && m.includes('"mode":"grace-80b"')){try{let p=JSON.parse(m); if(p.result&&p.result.message) return p.result.message;}catch(e){}} return m;}catch(e){return ''}})() || JSON.stringify(data).substring(0,500);
               replyDiv.innerHTML = `<div style="font-size:11px;opacity:0.7;">${getResidentDisplay()} → You (via Grace 80B 192.168.1.160:8080)</div><p style="margin:6px 0 0 0;white-space:pre-wrap;">${replyText.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</p>`;
               msgList.appendChild(replyDiv);
               msgList.scrollTop = msgList.scrollHeight;
