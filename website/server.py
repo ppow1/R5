@@ -247,7 +247,19 @@ async def invoke_operation(request: Request):
         obs = sock.observe(op)
         grant = sock.dispatch(op, task_class)
         ledger.append_event({"type":"operation_invoke","request": op,"grant": dict(grant),"task_class": task_class})
-        return {"contract":"r3a.steward-operation-result.v1","correlation_id": f"r5-op-{int(time.time())}","status":"completed","result":{"mode":"lightweight","message": f"R5 lean CME dispatched: {op.get('text','')[:200]}","grant": dict(grant)},"observation": dict(obs)}
+        # v27f unwrap - if CME already returned grace-80b, return it directly, not lightweight wrapper
+        try:
+            # cme_result is from cme/socket.py dispatch() - it already is r3a.steward-operation-result.v1 with mode grace-80b
+            if isinstance(cme_result, dict) and cme_result.get("result", {}).get("mode") == "grace-80b":
+                # Return real Grace text directly
+                return cme_result
+            if isinstance(cme_result, dict) and cme_result.get("contract") == "r3a.steward-operation-result.v1":
+                # Already correct contract - return as-is
+                return cme_result
+        except Exception as _unwrap_e:
+            pass
+        # Fallback lightweight only if CME failed
+        return cme_result if isinstance(cme_result, dict) else {"contract":"r3a.steward-operation-result.v1","status":"completed","result":{"mode":"grace-80b","message":str(cme_result),"text":str(cme_result)}},"observation": dict(obs)}
     except Exception as e:
         return JSONResponse(status_code=500, content={"contract":"r3a.steward-operation-result.v1","error":{"code":"dispatch_failed","message": str(e)[:2000] if isinstance(e, (str, Exception)) else str(type(e).__name__)+": "+str(e)[:1900]},"correlation_id": f"r5-err-{int(time.time())}"})
 
