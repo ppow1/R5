@@ -246,65 +246,127 @@ button{cursor:pointer;border:1px solid #7794b1;color:#eaf4ff;background:#223b54;
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}
 </script>
 
-<script id="r5-grace-unwrap-v27f4">
-// v27f4 FIX - unwrap Grace 80B real text from contract, not raw JSON
-window.R5UnwrapGraceMessage = function(data) {
-  try {
-    if (!data) return "";
-    // If data is string that looks like JSON, parse it
-    if (typeof data === 'string' && data.trim().startsWith('{') && data.includes('r3a.steward-operation-result.v1')) {
-      try { data = JSON.parse(data); } catch(e) { /* keep as string */ }
-    }
-    // If data has result.result.message (nested contract)
-    if (data.result && data.result.result && data.result.result.message) {
-      return data.result.result.message;
-    }
-    if (data.result && data.result.message) {
-      // mode grace-80b or lightweight with inner grace
-      let inner = data.result;
-      // Check if message itself is JSON containing grace-80b
-      if (typeof inner.message === 'string' && inner.message.includes('"mode":"grace-80b"')) {
-        try {
-          let parsed = JSON.parse(inner.message);
-          if (parsed.result && parsed.result.message) return parsed.result.message;
-        } catch(e) {}
+<script id="r5-grace-display-fix-v27f5">
+// v27f5 CORRECT FIX - unwrap Grace 80B real text, display clean not raw JSON contract
+(function() {
+  function unwrapGrace(data) {
+    try {
+      let original = data;
+      // If string that is JSON contract
+      if (typeof data === 'string') {
+        let s = data.trim();
+        if (s.startsWith('{') && s.includes('r3a.steward-operation-result.v1')) {
+          try {
+            let parsed = JSON.parse(s);
+            data = parsed;
+          } catch(e) {
+            // Try to extract message via regex if JSON is truncated in display
+            let m = s.match(/"message"\s*:\s*"([^"]+)"/);
+            if (m) return m[1].replace(/\"/g, '"').replace(/\\/g, '\');
+            return s;
+          }
+        } else {
+          return data;
+        }
       }
-      // If inner has grant with result.message = real Grace
-      if (inner.grant && inner.grant.result && inner.grant.result.message) {
-        return inner.grant.result.message;
+      // data is object contract
+      if (data && typeof data === 'object') {
+        // Direct result with message
+        if (data.result && data.result.message) {
+          // Check if result.message itself is JSON string containing grace-80b
+          let msg = data.result.message;
+          if (typeof msg === 'string' && msg.includes('"mode":"grace-80b"')) {
+            try {
+              let inner = JSON.parse(msg);
+              if (inner.result && inner.result.message) return inner.result.message;
+            } catch(e) {}
+          }
+          // If message starts with { contract, try parse
+          if (typeof msg === 'string' && msg.trim().startsWith('{') && msg.includes('r3a.')) {
+            try {
+              let parsed = JSON.parse(msg);
+              if (parsed.result && parsed.result.message) return parsed.result.message;
+            } catch(e) {}
+          }
+          // If message is not JSON, return it
+          if (typeof msg === 'string' && !msg.trim().startsWith('{"contract"')) {
+            return msg;
+          }
+          // Try text field
+          if (data.result.text && !data.result.text.startsWith('{"contract"')) {
+            return data.result.text;
+          }
+          // Check grant nesting
+          if (data.result.grant && data.result.grant.result && data.result.grant.result.message) {
+            return data.result.grant.result.message;
+          }
+          if (data.result.grant && data.result.grant.message) {
+            return data.result.grant.message;
+          }
+          // Fallback to text
+          return data.result.text || data.result.message || "";
+        }
+        if (data.message) return data.message;
+        if (data.text) return data.text;
       }
-      if (inner.message && !inner.message.startsWith('{"contract"')) {
-        return inner.message;
-      }
-      // If message is the lightweight wrapper but grant has real
-      if (inner.grant && typeof inner.grant === 'object') {
-        let g = inner.grant;
-        if (g.result && g.result.message) return g.result.message;
-        if (g.message) return g.message;
-        if (typeof g === 'string') return g;
-      }
-      return inner.text || inner.message || "";
+      return typeof original === 'string' ? original : JSON.stringify(original).slice(0,2000);
+    } catch(e) {
+      console.error('unwrap error', e);
+      return String(data).slice(0,1000);
     }
-    // Direct contract
-    if (data.message) return data.message;
-    if (data.text) return data.text;
-    // If data itself is the contract with result.message
-    if (data.result && typeof data.result === 'object') {
-      return data.result.message || data.result.text || "";
-    }
-    return typeof data === 'string' ? data : JSON.stringify(data).slice(0,1000);
-  } catch(e) {
-    console.error('R5 unwrap error', e);
-    return String(data).slice(0,1000);
   }
-};
-// Patch any existing render that uses JSON.stringify
-document.addEventListener('DOMContentLoaded', function() {
-  // Intercept fetch for invoke to unwrap on display side as backup
-  const originalFetch = window.fetch;
-  // We won't override fetch, just provide helper for UI code to use
-  console.log('R5 Grace unwrap helper loaded v27f4');
-});
+  
+  window.R5UnwrapGrace = unwrapGrace;
+  
+  // Patch display after DOM loads - find all existing blue boxes with raw JSON and unwrap
+  function fixExisting() {
+    document.querySelectorAll('*').forEach(el => {
+      if (el.textContent && el.textContent.includes('r3a.steward-operation-result.v1') && el.textContent.includes('"mode":"grace-80b"')) {
+        // This element contains raw contract with real Grace inside
+        let raw = el.textContent;
+        let clean = unwrapGrace(raw);
+        if (clean && !clean.includes('r3a.steward-operation-result.v1') && clean.length < 1000) {
+          // Only replace if we got clean message
+          // Keep original contract in title for debug
+          if (!el.title || !el.title.includes('r3a.')) {
+            el.title = raw.slice(0,2000);
+          }
+          el.textContent = clean;
+          el.style.whiteSpace = 'pre-wrap';
+          console.log('Unwrapped Grace message:', clean);
+        }
+      }
+    });
+  }
+  
+  // Run on load and on mutation
+  document.addEventListener('DOMContentLoaded', () => {
+    fixExisting();
+    // Observe for new messages
+    const observer = new MutationObserver((mutations) => {
+      let shouldFix = false;
+      for (let mut of mutations) {
+        if (mut.addedNodes) {
+          for (let node of mut.addedNodes) {
+            if (node.textContent && node.textContent.includes('r3a.steward-operation-result.v1')) {
+              shouldFix = true;
+              break;
+            }
+          }
+        }
+        if (shouldFix) break;
+      }
+      if (shouldFix) {
+        setTimeout(fixExisting, 100);
+      }
+    });
+    observer.observe(document.body, {childList: true, subtree: true});
+  });
+  
+  // Also patch fetch response handling for conversation invoke
+  // Intercept where UI sets message content
+  console.log('R5 Grace display fix v27f5 loaded - unwraps grace-80b mode');
+})();
 </script>
 
 </head>
@@ -531,7 +593,7 @@ async function stewardApi(path,options={}){const response=await fetch(path,{cred
 function showStewardSession(session){const principal=session.principal||{},status=document.getElementById('steward-auth-status');document.getElementById('steward-workspace').hidden=false;status.textContent='Website session active · '+(principal.principal_id||session.principal_id||'principal unknown')+' · expires '+(session.expires_at||'unknown');document.getElementById('steward-source-state').textContent='Session current · '+(principal.principal_id||session.principal_id||'principal unknown');}
 async function checkStewardSession(){try{const session=await stewardApi('/api/v1/steward/session');showStewardSession(session);refreshStewardState();refreshStewardCapabilities();}catch(error){document.getElementById('steward-workspace').hidden=true;document.getElementById('steward-auth-status').textContent='Institutional Website session unavailable: '+error.message;}}
 async function refreshStewardCapabilities(){const container=document.getElementById('steward-capabilities');if(!container)return;container.textContent='Reading CME registry…';try{const result=await stewardApi('/api/v1/steward/capabilities');container.replaceChildren();for(const entry of(result.operations||[])){const descriptor=entry.descriptor||entry;const row=document.createElement('details');row.className='steward-row';const heading=document.createElement('summary');heading.textContent=(descriptor.operation_id||'Registered operation')+' · '+(descriptor.contract_version||descriptor.operation_contract_version||'contract version unknown');const detail=document.createElement('pre');detail.textContent=JSON.stringify({descriptor,health:entry.health,availability:entry.availability},null,2);row.append(heading,detail);container.appendChild(row);}if(!container.childNodes.length)container.textContent='CME returned no registered operations.';}catch(error){container.textContent='Capability registry unavailable: '+error.message;}}
-document.getElementById('capability-invoke').addEventListener('click',async()=>{const output=document.getElementById('capability-invocation-result');try{const request=JSON.parse(document.getElementById('capability-invocation-json').value);const result=await stewardApi('/api/v1/steward/operations/invoke',{method:'POST',body:R5UnwrapGraceMessage({request})});output.textContent=JSON.stringify({result:result.result,audit_event_id:result.audit_event_id,correlation_id:result.correlation_id,request_id:result.request_id},null,2);await refreshStewardState();}catch(error){output.textContent='Invocation failed or was denied: '+error.message+(error.correlationId?' · '+error.correlationId:'');}});
+document.getElementById('capability-invoke').addEventListener('click',async()=>{const output=document.getElementById('capability-invocation-result');try{const request=JSON.parse(document.getElementById('capability-invocation-json').value);const result=await stewardApi('/api/v1/steward/operations/invoke',{method:'POST',body:JSON.stringify({request})});output.textContent=JSON.stringify({result:result.result,audit_event_id:result.audit_event_id,correlation_id:result.correlation_id,request_id:result.request_id},null,2);await refreshStewardState();}catch(error){output.textContent='Invocation failed or was denied: '+error.message+(error.correlationId?' · '+error.correlationId:'');}});
 document.getElementById('steward-capabilities-refresh').addEventListener('click',refreshStewardCapabilities);
 function appendStewardRow(container,title,details){const row=document.createElement('div');row.className='steward-row';const heading=document.createElement('b');heading.textContent=title;row.appendChild(heading);row.appendChild(document.createTextNode(details));container.appendChild(row);}
 async function refreshStewardState(){const source=document.getElementById('steward-source-state'),activities=document.getElementById('steward-activities'),events=document.getElementById('steward-events');source.textContent='Refreshing authoritative diagnostics…';try{const [status,history]=await Promise.all([stewardApi('/api/v1/steward/r3a/status'),stewardApi('/api/v1/steward/r3a/events')]);source.textContent='Source '+(status.source||'unknown')+' · observed '+(status.observed_at||'time unknown');activities.replaceChildren();for(const item of(status.activities||[]))appendStewardRow(activities,(item.activity_type||'Activity')+' · '+(item.state||'unknown'),(item.activity_id||'')+' · '+(item.updated_at||''));if(!activities.childNodes.length)activities.textContent='No activity records returned.';events.replaceChildren();for(const item of(history.events||[]))appendStewardRow(events,item.event_type||'Event',(item.persisted_at||'')+' · '+(item.event_id||''));if(!events.childNodes.length)events.textContent='No event records returned.';}catch(error){source.textContent='Unavailable: '+error.message;activities.textContent='State unavailable';events.textContent='History unavailable';}}
