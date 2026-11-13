@@ -45,17 +45,23 @@ async def steward_html():
     return FileResponse(str(DASH / "index.html"))
 
 # --- V19 NEW: About dynamic endpoint ---
-
 @app.get("/api/v1/about")
 async def about():
-    import pathlib, json, time, os
-    base = pathlib.Path(__file__).parent.parent
-    dossier_dir = base / "data" / "residents_dossiers"
-    # Also check deploy path
-    if not dossier_dir.exists():
-        dossier_dir = pathlib.Path("/opt/riverview/r5-full/data/residents_dossiers")
-    
-    residents = {}
+    import pathlib as _pl, json, time, os
+    from datetime import datetime as _dt
+    base2 = _pl.Path(__file__).parent.parent
+    def safe_stat(p):
+        try:
+            st = p.stat()
+            return {"file": p.name, "size": st.st_size, "mtime": _dt.fromtimestamp(st.st_mtime).isoformat()}
+        except:
+            return {"file": str(p), "size": 0, "error": "not found"}
+    website_file = base2 / "website" / "server.py"
+    cme_file = base2 / "cme" / "socket.py"
+    dashboard_file = base2 / "dashboard" / "index.html"
+    about_file = base2 / "dashboard" / "about.html"
+    dossiers_dir = base2 / "data" / "residents_dossiers"
+    dossiers = {}
     residents_list = []
     short_titles = {
         "alyssa": "Chief of Staff",
@@ -74,63 +80,53 @@ async def about():
         "gray_man": "Gray",
         "self": "Self"
     }
-    
-    if dossier_dir.exists():
-        for f in sorted(dossier_dir.glob("*.json")):
-            try:
-                j = json.loads(f.read_text())
-                rid = j.get("id", f.stem.split(".")[0]).lower()
-                # Normalize gray_man to gm
-                if rid == "gray_man":
-                    rid = "gm"
-                # Force short title
-                short = short_titles.get(rid, j.get("role", rid))
-                display = f"{'GM' if rid=='gm' else rid.capitalize()} - {short}" if rid != 'self' else "Self"
-                # Override display if already short in file
-                if "display_name" in j and len(j["display_name"]) < 40 and "Comptroller" not in j["display_name"] and "Guardian" not in j["display_name"] and "Foundry" not in j["display_name"] and "Only male" not in j["display_name"]:
-                    display = j["display_name"]
-                residents[f.name] = {
-                    "id": rid,
-                    "level": j.get("epistemic_config", {}).get("level", "balanced"),
-                    "name": f.name,
-                    "display_name": display,
-                    "role": short,
-                    "short_title": short,
-                    "title": short
-                }
-                residents_list.append(rid)
-            except Exception as e:
-                residents[f.name] = {"error": str(e), "name": f.name}
-    
-    # Dashboard and CME sizes
-    dash_path = base / "dashboard" / "index.html"
-    cme_path = base / "cme" / "socket.py"
-    server_path = pathlib.Path(__file__)
-    about_html = base / "dashboard" / "about.html"
-    
-    def get_size_mtime(p):
-        try:
-            return {"size": p.stat().st_size, "mtime": str(p.stat().st_mtime)}
-        except:
-            return {"size": 0, "mtime": "missing"}
-    
+    try:
+        if dossiers_dir.exists():
+            for f in sorted(dossiers_dir.glob("*.json")):
+                try:
+                    d = json.loads(f.read_text())
+                    rid = d.get("id", f.stem.split(".")[0]).lower()
+                    if rid == "gray_man":
+                        rid = "gm"
+                    ep = d.get("epistemic_config",{})
+                    short = short_titles.get(rid, d.get("role", rid))
+                    display = d.get("display_name", "")
+                    # Force short if bloat detected
+                    if not display or "Comptroller" in display or "Guardian" in display or "Foundry" in display or "Only male" in display or "Great Courtyard" in display or "()" in display or "#1" in display:
+                        disp_name = "GM" if rid=="gm" else rid.capitalize()
+                        display = f"{disp_name} - {short}"
+                    dossiers[f.name] = {
+                        "id": rid,
+                        "level": ep.get("level","balanced"),
+                        "name": f.name,
+                        "display_name": display,
+                        "role": short,
+                        "short_title": short,
+                        "title": short
+                    }
+                    residents_list.append(rid)
+                except Exception as e:
+                    dossiers[f.name] = {"error": str(e), "name": f.name}
+    except Exception as e:
+        dossiers["error"] = str(e)
+
     return {
         "contract": "r5.about.v1",
-        "version": "R5 v26c GM caps GM - Gray uppercase + plus button v26 final short titles",
-        "commit": "8a2f74a R5 v26c short titles + plus button - Engineering not Foundry, Gray not Gray Man, Security Chief not firewall, CPA",
+        "version": "R5 v26e GM caps GM - Gray uppercase + plus button v26 final short titles - Auth restored",
+        "commit": "8a2f74a R5 v26c short titles + plus button - Engineering not Foundry, Gray not Gray Man, Security Chief not firewall, CPA - Auth fix v26e",
         "dashboard": "R5 CONTROLLED DOCUMENT Rev 1.0.30",
-        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "timestamp": _dt.utcnow().isoformat() + "Z",
         "host": "192.168.1.155:8080",
         "anchor": {"x": 0.377, "y": 0.653},
         "backgroundPosition": "37.7% 65.3%",
         "background": {"file": "waterwheel_dashboard_map_labels.png", "status": "fixed v19", "previous": "missing v18"},
-        "website": {"file": "server.py", "size": get_size_mtime(server_path)["size"], "mtime": get_size_mtime(server_path)["mtime"]},
-        "cme": {"file": "socket.py", "size": get_size_mtime(cme_path)["size"], "mtime": get_size_mtime(cme_path)["mtime"], "pass": True, "mode": "lean-v24-per-resident-conv-epistemic"},
-        "server": {"file": "server.py", "size": get_size_mtime(server_path)["size"], "mtime": get_size_mtime(server_path)["mtime"]},
-        "dashboard_file": {"file": "index.html", "size": get_size_mtime(dash_path)["size"], "mtime": get_size_mtime(dash_path)["mtime"]},
-        "about_file": {"file": "about.html", "size": get_size_mtime(about_html)["size"], "mtime": get_size_mtime(about_html)["mtime"]},
+        "website": safe_stat(website_file),
+        "cme": {"file": "socket.py", "size": safe_stat(cme_file)["size"], "mtime": safe_stat(cme_file)["mtime"], "pass": True, "mode": "lean-v24-per-resident-conv-epistemic"},
+        "server": safe_stat(website_file),
+        "dashboard_file": safe_stat(dashboard_file),
+        "about_file": safe_stat(about_file),
         "capabilities": {},
-        "residents_dossiers": residents,
+        "residents_dossiers": dossiers,
         "residents_list": sorted(set(residents_list)),
         "short_titles": short_titles,
         "vision": {
@@ -144,8 +140,9 @@ async def about():
         },
         "registries": {"settings": "R3 settings registry not connected - R5 local Help->About now injected", "note": "DB 010_governed_knowledge 011_resident_dossiers source JSON cache avoids 100k JSON"},
         "routes": ["/about", "/steward/about", "/api/v1/about", "/api/v1/visual/status", "/api/v1/visual/activate", "/api/v1/visual/background", "/steward"],
-        "help_section": {"path": "Settings -> Help -> About", "status": "injected v26c Help and About buttons after Infrastructure", "dynamic": "GET /api/v1/about live + iframe /about"}
+        "help_section": {"path": "Settings -> Help -> About", "status": "injected v26e Help and About buttons after Infrastructure", "dynamic": "GET /api/v1/about live + iframe /about"}
     }
+
 
 
 @app.get("/api/v1/visual/background")
