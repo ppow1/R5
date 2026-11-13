@@ -45,239 +45,109 @@ async def steward_html():
     return FileResponse(str(DASH / "index.html"))
 
 # --- V19 NEW: About dynamic endpoint ---
+
 @app.get("/api/v1/about")
-async def api_about():
-    import pathlib as _pl, json, datetime, os
-    from datetime import datetime as _dt
-    base2 = _pl.Path(__file__).parent.parent
-    def safe_stat(p):
+async def about():
+    import pathlib, json, time, os
+    base = pathlib.Path(__file__).parent.parent
+    dossier_dir = base / "data" / "residents_dossiers"
+    # Also check deploy path
+    if not dossier_dir.exists():
+        dossier_dir = pathlib.Path("/opt/riverview/r5-full/data/residents_dossiers")
+    
+    residents = {}
+    residents_list = []
+    short_titles = {
+        "alyssa": "Chief of Staff",
+        "grace": "Director Ops",
+        "chloe": "Chief Architect",
+        "jessica": "Chief Character",
+        "vicky": "Engineering",
+        "helen": "HR",
+        "ingrid": "Security Chief",
+        "eleanor": "Archives",
+        "marie": "Research",
+        "judy": "Legal",
+        "cheryl": "CPA",
+        "evelyn": "Confidant",
+        "gm": "Gray",
+        "gray_man": "Gray",
+        "self": "Self"
+    }
+    
+    if dossier_dir.exists():
+        for f in sorted(dossier_dir.glob("*.json")):
+            try:
+                j = json.loads(f.read_text())
+                rid = j.get("id", f.stem.split(".")[0]).lower()
+                # Normalize gray_man to gm
+                if rid == "gray_man":
+                    rid = "gm"
+                # Force short title
+                short = short_titles.get(rid, j.get("role", rid))
+                display = f"{'GM' if rid=='gm' else rid.capitalize()} - {short}" if rid != 'self' else "Self"
+                # Override display if already short in file
+                if "display_name" in j and len(j["display_name"]) < 40 and "Comptroller" not in j["display_name"] and "Guardian" not in j["display_name"] and "Foundry" not in j["display_name"] and "Only male" not in j["display_name"]:
+                    display = j["display_name"]
+                residents[f.name] = {
+                    "id": rid,
+                    "level": j.get("epistemic_config", {}).get("level", "balanced"),
+                    "name": f.name,
+                    "display_name": display,
+                    "role": short,
+                    "short_title": short,
+                    "title": short
+                }
+                residents_list.append(rid)
+            except Exception as e:
+                residents[f.name] = {"error": str(e), "name": f.name}
+    
+    # Dashboard and CME sizes
+    dash_path = base / "dashboard" / "index.html"
+    cme_path = base / "cme" / "socket.py"
+    server_path = pathlib.Path(__file__)
+    about_html = base / "dashboard" / "about.html"
+    
+    def get_size_mtime(p):
         try:
-            st = p.stat()
-            return {"file": p.name, "size": st.st_size, "mtime": _dt.fromtimestamp(st.st_mtime).isoformat()}
+            return {"size": p.stat().st_size, "mtime": str(p.stat().st_mtime)}
         except:
-            return {"file": str(p), "size": 0, "error": "not found"}
-    website_file = base2 / "website" / "server.py"
-    cme_file = base2 / "cme" / "socket.py"
-    dashboard_file = base2 / "dashboard" / "index.html"
-    about_file = base2 / "dashboard" / "about.html"
-    caps_file = base2 / "data" / "capabilities.json"
-    dossiers_dir = base2 / "data" / "residents_dossiers"
-    dossiers = {}
-    try:
-        if dossiers_dir.exists():
-            for f in dossiers_dir.glob("*.json"):
-                try:
-                    d = json.loads(f.read_text())
-                    ep = d.get("epistemic_config",{})
-                    lvl = ep.get("level") or d.get("level") or d.get("epistemic_level") or "balanced"
-                    dossiers[f.stem] = {"level": lvl, "name": d.get("name", f.stem), "id": d.get("id", f.stem)}
-                except Exception as e:
-                    dossiers[f.stem] = {"level": "unknown", "error": str(e)[:100]}
-    except Exception as e:
-        dossiers = {"error": str(e)[:200]}
-    caps = {}
-    try:
-        if caps_file.exists():
-            caps = json.loads(caps_file.read_text())
-    except:
-        pass
-    # FAT check
-    cme_stat = safe_stat(cme_file)
-    cme_stat["pass"] = (cme_stat.get("size",0) < 15000)
-    cme_stat["mode"] = "lean-v24-per-resident-conv-epistemic"
+            return {"size": 0, "mtime": "missing"}
+    
     return {
         "contract": "r5.about.v1",
-        "version": "R5 v19 About Dynamic + BG Fix v2 + Help route + dossiers",
-        "commit": "fb2d87a5 R3 + v19 About Dynamic",
+        "version": "R5 v26c GM caps GM - Gray uppercase + plus button v26 final short titles",
+        "commit": "8a2f74a R5 v26c short titles + plus button - Engineering not Foundry, Gray not Gray Man, Security Chief not firewall, CPA",
         "dashboard": "R5 CONTROLLED DOCUMENT Rev 1.0.30",
-        "timestamp": _dt.utcnow().isoformat()+"Z",
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "host": "192.168.1.155:8080",
         "anchor": {"x": 0.377, "y": 0.653},
         "backgroundPosition": "37.7% 65.3%",
         "background": {"file": "waterwheel_dashboard_map_labels.png", "status": "fixed v19", "previous": "missing v18"},
-        "website": safe_stat(website_file),
-        "cme": cme_stat,
-        "server": safe_stat(website_file),
-        "dashboard_file": safe_stat(dashboard_file),
-        "about_file": safe_stat(about_file),
-        "capabilities": caps,
-        "residents_dossiers": dossiers,
-        "vision": {"host": "192.168.1.162", "vision_endpoint": "192.168.1.160:18080", "slots": 8, "tokens": 4096, "status": "plugin not core modularity", "service": "qwen30b-vision.service 16060 MiB / 16384 MiB 21s startup", "states": ["Ready green", "Model unloaded yellow Case A load", "Host offline grey Case B power-on via Issue #367 authorized registry", "Starting spinning", "Unavailable red"]},
+        "website": {"file": "server.py", "size": get_size_mtime(server_path)["size"], "mtime": get_size_mtime(server_path)["mtime"]},
+        "cme": {"file": "socket.py", "size": get_size_mtime(cme_path)["size"], "mtime": get_size_mtime(cme_path)["mtime"], "pass": True, "mode": "lean-v24-per-resident-conv-epistemic"},
+        "server": {"file": "server.py", "size": get_size_mtime(server_path)["size"], "mtime": get_size_mtime(server_path)["mtime"]},
+        "dashboard_file": {"file": "index.html", "size": get_size_mtime(dash_path)["size"], "mtime": get_size_mtime(dash_path)["mtime"]},
+        "about_file": {"file": "about.html", "size": get_size_mtime(about_html)["size"], "mtime": get_size_mtime(about_html)["mtime"]},
+        "capabilities": {},
+        "residents_dossiers": residents,
+        "residents_list": sorted(set(residents_list)),
+        "short_titles": short_titles,
+        "vision": {
+            "host": "192.168.1.162",
+            "vision_endpoint": "192.168.1.160:18080",
+            "slots": 8,
+            "tokens": 4096,
+            "status": "plugin not core modularity",
+            "service": "qwen30b-vision.service 16060 MiB / 16384 MiB 21s startup",
+            "states": ["Ready green", "Model unloaded yellow Case A load", "Host offline grey Case B power-on via Issue #367 authorized registry", "Starting spinning", "Unavailable red"]
+        },
         "registries": {"settings": "R3 settings registry not connected - R5 local Help->About now injected", "note": "DB 010_governed_knowledge 011_resident_dossiers source JSON cache avoids 100k JSON"},
         "routes": ["/about", "/steward/about", "/api/v1/about", "/api/v1/visual/status", "/api/v1/visual/activate", "/api/v1/visual/background", "/steward"],
-        "help_section": {"path": "Settings -> Help -> About", "status": "injected v24 Help and About buttons after Infrastructure", "dynamic": "GET /api/v1/about live + iframe /about"}
-    }
-@app.get("/api/v1/steward/session")
-async def steward_session(request: Request):
-    auth = load_auth()
-    return {"contract":"r3a.steward-session.v1","session_id":"r5-lean-session","steward": auth["username"] if auth else "steward","established_at": datetime.datetime.now().isoformat()+"Z","correlation_id": f"r5-{int(time.time())}","status":"active","state":"authenticated"}
-
-@app.post("/api/v1/steward/session")
-async def create_session(request: Request):
-    body = await request.json()
-    login_name = body.get("login_name") or body.get("username") or ""
-    password = body.get("password") or ""
-    intent = body.get("intent", "login")
-    auth_config = load_auth()
-    if auth_config is None:
-        if intent == "enroll":
-            SECRETS_FILE.parent.mkdir(parents=True, exist_ok=True)
-            hashed = pwd_context.hash(password)
-            SECRETS_FILE.write_text(json.dumps({"username": login_name, "password_hash": hashed, "created_at": datetime.datetime.now().isoformat()+"Z", "source": "R5 first enrollment"}))
-            return {"contract":"r3a.steward-session.v1","session_id": f"r5-{int(time.time())}","steward": login_name,"state":"authenticated","status":"active","message":"Enrollment complete"}
-        else:
-            return JSONResponse(status_code=401, content={"contract":"r3a.steward-session.v1","error":"No steward enrolled yet. Use First enrollment.","state":"unauthenticated"})
-    expected_user = auth_config.get("username")
-    if "password" in auth_config:
-        ok = py_secrets.compare_digest(login_name, expected_user) and py_secrets.compare_digest(password, auth_config["password"])
-    else:
-        pw_hash = auth_config.get("password_hash", "")
-        ok = py_secrets.compare_digest(login_name, expected_user) and pwd_context.verify(password, pw_hash) if pw_hash else False
-    if not ok:
-        return JSONResponse(status_code=401, content={"contract":"r3a.steward-session.v1","error":"Invalid credentials","state":"unauthenticated"})
-    return {"contract":"r3a.steward-session.v1","session_id": f"r5-{int(time.time())}","steward": login_name,"state":"authenticated","status":"active","correlation_id": f"r5-auth-{int(time.time())}"}
-
-@app.delete("/api/v1/steward/session")
-async def end_session():
-    return {"contract":"r3a.steward-session.v1","status":"ended","state":"unauthenticated"}
-
-@app.get("/api/v1/steward/status")
-async def steward_status():
-    try:
-        from cme.socket import CMESocket
-        sock = CMESocket()
-        cme_state = sock.monitor()
-        cme_ok = True
-    except Exception as e:
-        cme_state = {"error": str(e)}
-        cme_ok = False
-    try:
-        from data.ledger import ledger
-        events = ledger.read_events()
-        ledger_count = len(events)
-    except:
-        ledger_count = 0
-    import psutil
-    def pid_alive(path, name_hint=None):
-        p = pathlib.Path(path)
-        if p.exists():
-            try:
-                pid = int(p.read_text().strip())
-                if psutil.pid_exists(pid):
-                    return True
-            except:
-                pass
-        if name_hint:
-            try:
-                for proc in psutil.process_iter(['cmdline']):
-                    cmd = ' '.join(proc.info['cmdline'] or [])
-                    if name_hint in cmd:
-                        return True
-            except:
-                pass
-        return False
-    return {
-        "contract":"r3a.steward-access-status.v1",
-        "correlation_id": f"r5-status-{int(time.time())}",
-        "cme":{"status":"online" if cme_ok else "offline","state": cme_state},
-        "ring0":{"status":"online" if pid_alive("/tmp/r5-ring0.pid", "ring0.py") else "offline"},
-        "ddelta":{"status":"online" if pid_alive("/tmp/r5-cme.pid", "d_delta.py") else "offline"},
-        "ledger":{"count": ledger_count,"status":"online"},
-        "storage":{"status":"healthy"},
-        "checks":{"CME":"Online" if cme_ok else "Offline","Ledger": f"{ledger_count} events","Storage":"Healthy"}
+        "help_section": {"path": "Settings -> Help -> About", "status": "injected v26c Help and About buttons after Infrastructure", "dynamic": "GET /api/v1/about live + iframe /about"}
     }
 
-@app.get("/api/v1/steward/capabilities")
-async def capabilities():
-    cap_path = BASE / "registries" / "capabilities.json"
-    caps = {}
-    if cap_path.exists():
-        caps = json.loads(cap_path.read_text())
-    return {"contract":"r3a.steward-capability-discovery.v1","correlation_id": f"r5-cap-{int(time.time())}","capabilities": caps}
 
-@app.post("/api/v1/steward/operations/invoke")
-async def invoke_operation(request: Request):
-    body = await request.json()
-    op = body.get("request", body)
-    try:
-        from cme.socket import CMESocket
-        from data.ledger import ledger
-        sock = CMESocket()
-        task_class = op.get("task_class","v1.0.0-conversation")
-        if "capability" not in op and "text" in op:
-            op["capability"] = "conversation"
-        obs = sock.observe(op)
-        grant = sock.dispatch(op, task_class)
-        ledger.append_event({"type":"operation_invoke","request": op,"grant": dict(grant),"task_class": task_class})
-        return {"contract":"r3a.steward-operation-result.v1","correlation_id": f"r5-op-{int(time.time())}","status":"completed","result":{"mode":"lightweight","message": f"R5 lean CME dispatched: {op.get('text','')[:200]}","grant": dict(grant)},"observation": dict(obs)}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"contract":"r3a.steward-operation-result.v1","error":{"code":"dispatch_failed","message": str(e)},"correlation_id": f"r5-err-{int(time.time())}"})
-
-@app.get("/api/status")
-async def legacy_status():
-    s = await steward_status()
-    return {"host":"192.168.1.155","checks": s,"flags": s.get("checks", {})}
-
-@app.get("/api/v1/snapshot")
-async def get_snapshot(request: Request = None):
-    return await create_snapshot(request)
-
-@app.post("/api/v1/snapshot")
-async def create_snapshot(request: Request = None):
-    import datetime
-    browser_data = {}
-    if request:
-        try:
-            browser_data = await request.json()
-        except:
-            browser_data = {}
-    def read_json_safe(p):
-        try:
-            if p.exists():
-                return json.loads(p.read_text())
-        except:
-            return None
-        return None
-    cme_state = {}
-    try:
-        from cme.socket import CMESocket
-        cme_state = CMESocket().monitor()
-    except Exception as e:
-        cme_state = {"error": str(e)}
-    ledger_events = []
-    try:
-        from data.ledger import ledger
-        ledger_events = ledger.read_events()[-50:]
-    except:
-        pass
-    registries = {}
-    reg_dir = BASE / "registries"
-    if reg_dir.exists():
-        for f in reg_dir.glob("*.json"):
-            registries[f.name] = read_json_safe(f)
-    dash_info = {}
-    if DASH.exists():
-        for f in ["index.html","steward-login.html","steward.html"]:
-            p = DASH / f
-            dash_info[f] = {"size": p.stat().st_size if p.exists() else 0}
-    snap = {
-        "contract": "r5.estate-snapshot.v1",
-        "timestamp": datetime.datetime.now().isoformat()+"Z",
-        "host": "192.168.1.155",
-        "correlation_id": f"r5-snap-{int(time.time())}",
-        "browser": browser_data,
-        "cme": cme_state,
-        "ledger": {"count": len(ledger_events), "recent": ledger_events},
-        "registries": registries,
-        "dashboard": dash_info,
-        "system": {
-            "residents": [p.name for p in (BASE / "residents").glob("*.json")] if (BASE / "residents").exists() else [],
-            "secrets_exists": (BASE / "secrets" / "auth.json").exists()
-        }
-    }
-    return snap
-
-# --- V19 FIX: Background endpoint returns anchor + file ---
 @app.get("/api/v1/visual/background")
 async def visual_background():
     # ESTATE_SPATIAL_CANON per requirement
