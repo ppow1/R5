@@ -1,0 +1,18 @@
+{
+  "local_cad": {
+    "proven": true,
+    "input": "text",
+    "output": "STL",
+    "owner": "Foundry uses not owns",
+    "manifest": "r3a.module-manifest.v1@1.0.0",
+    "execution_contract": "r3a.resident.module-binding@1.0.0",
+    "size_target": "5KB manifest 181B-5KB module",
+    "process_graph": "text->validate->slice->stl"
+  },
+  "text_to_stl": {
+    "uses": "local_cad"
+  },
+  "module_contract": {
+    "clean_example": "module_contracts.py 5,427 bytes 0 BLOCKED"
+  }
+}

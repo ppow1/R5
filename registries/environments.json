@@ -1,0 +1,25 @@
+{
+  "castle": [
+    "Architecture College",
+    "Operations Keep",
+    "Research Grove",
+    "Character Architecture",
+    "Engineering Foundry",
+    "Records & Memory Hall",
+    "Archives & Library",
+    "Security Gatehouse",
+    "Great Courtyard"
+  ],
+  "undercurrent": {
+    "veil": "selected portals only",
+    "who": [
+      "Evelyn",
+      "Gray Man"
+    ],
+    "privacy": "Area 51 scientists dont let me out"
+  },
+  "aa_mode": {
+    "owner": "Grace",
+    "mode": "skunk works top secret off-logs to USB no PG residue"
+  }
+}

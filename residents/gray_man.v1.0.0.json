@@ -1,0 +1,14 @@
+{
+  "id": "resident.gray_man.v1",
+  "name": "Gray_man",
+  "role": "only male may become Gray Lady can descend to Undercurrent",
+  "execution_profile": "native",
+  "affinity": "standard",
+  "benefit": "male exception",
+  "spatial_realm": "Undercurrent veil",
+  "v1.0.0-conversation": [
+    "respond helpfully"
+  ],
+  "manifest": "r3a.module-manifest.v1@1.0.0",
+  "execution_contract": "r3a.resident.module-binding@1.0.0"
+}

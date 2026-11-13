@@ -1,0 +1,30 @@
+{
+  "status": "healthy",
+  "tasks": 0,
+  "hardware": {
+    "octominer1": {
+      "gpus": "4x P100 BIOS mod -> 8x",
+      "ram": "16GB",
+      "moe": "80B 8-12 active ~30 tok/s 1 slot, 50 2 slots, 18 3 slots, 11-12 4 slots"
+    },
+    "octominer2": {
+      "model": "30B vision",
+      "load": "7.5 sec x16 slot vs 30-45 sec before"
+    },
+    "camarillo": {
+      "cpu": "N95 15W",
+      "role": "always-on CME loop + websites + 0.6B autonomic",
+      "latency": "30-80 sec receptionist"
+    },
+    "dev": {
+      "3060Ti": 1,
+      "4090": 1,
+      "sas": "13.6TB 520->512 12h format",
+      "displays": "4x55 4K quad",
+      "stream_deck": "idle",
+      "core_unit": "6x6x2",
+      "quest2": 1,
+      "command_chair": 1
+    }
+  }
+}

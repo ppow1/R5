@@ -1,0 +1,17 @@
+[Unit]
+Description=Riverview 5 System B - D-Delta - CME Runner - Waterwheel
+After=r5-ring0.service
+Requires=r5-ring0.service
+# Runs ON TOP of System D
+
+[Service]
+Type=simple
+User=riverview
+WorkingDirectory=/opt/riverview/r5-full
+ExecStart=/usr/bin/python3 system_b/d_delta.py
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,18 @@
+[Unit]
+Description=Riverview 5 Website Listener - Dashboard + API
+After=r5-ddelta.service
+Requires=r5-ddelta.service
+# Serves dashboard/index.html + /api/status + /ws live
+# Your 4x55" quad display points here
+
+[Service]
+Type=simple
+User=riverview
+WorkingDirectory=/opt/riverview/r5-full
+ExecStart=/usr/bin/python3 -m uvicorn website.server:app --host 0.0.0.0 --port 8080
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,4 @@
+[project]
+name="r5"
+version="5.0.0-alpha"
+requires-python=">=3.9"

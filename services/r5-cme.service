@@ -1,0 +1,20 @@
+[Unit]
+Description=Riverview 5 System B - CME Waterwheel + Watcher for Ring Zero
+After=network.target r5-ring0.service
+Wants=r5-ring0.service
+# This is the CME waterwheel - Observe Understand Plan Decompose Dispatch Monitor Validate Recover Integrate Learn
+
+[Service]
+Type=simple
+User=riverview
+WorkingDirectory=/opt/riverview/r5-full
+ExecStart=/usr/bin/python3 system_b/d_delta.py
+Restart=always
+RestartSec=5
+PIDFile=/tmp/r5-cme.pid
+Environment=PYTHONUNBUFFERED=1
+# CME watches /tmp/r5-ring0.pid and restarts Ring Zero if dead
+# Together they ensure estate always alive even if one crashes
+
+[Install]
+WantedBy=multi-user.target

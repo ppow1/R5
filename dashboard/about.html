@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>R5 About Dynamic v19</title>
+<style>
+body{font-family:system-ui;background:#08121e;color:#c6d6e6;padding:20px}
+.card{background:#10223888;border:1px solid #c2d5ec33;border-radius:10px;padding:12px;margin:10px 0}
+.badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;margin:2px}
+.pass{background:#0f3d1f88;color:#7fda9d}.fail{background:#3d0f0f88;color:#da7f7f}
+pre{white-space:pre-wrap;background:#091522;padding:10px;border-radius:8px;overflow:auto;font-size:11px}
+</style></head><body>
+<h1>R5 About Dynamic v19 - Settings->Help->About</h1>
+<div id="status">Loading /api/v1/about live...</div>
+<div id="content"></div>
+<img id="bg-thumb" style="max-width:400px;border-radius:8px;margin-top:10px;display:none" alt="waterwheel">
+<script>
+async function load(){
+  try{
+    const r = await fetch("/api/v1/about",{credentials:"same-origin"});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const about = await r.json();
+    document.getElementById("status").innerHTML = "Host: "+(about.host||"")+" | Commit: "+(about.commit||about.version||"")+" | Timestamp: "+about.timestamp+" <span class=\"badge pass\">R5 not R4 dynamic UPD</span>";
+    let html = "";
+    if(about.website) html += "<div class=\"card\"><b>Website</b>: "+(about.website.version||"")+" - "+(about.website.size||"")+" bytes</div>";
+    if(about.server) html += "<div class=\"card\"><b>Server</b>: "+(about.server.file||"")+" - "+(about.server.size||"")+" bytes</div>";
+    if(about.cme) html += "<div class=\"card\"><b>CME</b>: "+(about.cme.file||"")+" - "+(about.cme.size||"")+" bytes <span class=\"badge "+(about.cme.pass?"pass":"fail")+"\">"+(about.cme.pass?"PASS <15KB":"")+"</span> - mode: "+(about.cme.mode||"")+"</div>";
+    html += "<div class=\"card\"><b>Capabilities</b><pre>"+JSON.stringify(about.capabilities||{},null,2)+"</pre></div>";
+    if(about.residents_dossiers) html += "<div class=\"card\"><b>Residents Dossiers plugin not core</b><pre>"+JSON.stringify(about.residents_dossiers,null,2)+"</pre></div>";
+    if(about.vision) html += "<div class=\"card\"><b>Vision plugin</b><pre>"+JSON.stringify(about.vision,null,2)+"</pre></div>";
+    html += "<div class=\"card\"><b>Full r5.about.v1 - Grace query via POST /api/v1/steward/operations/invoke task_class v1.0.0-conversation</b><pre>"+JSON.stringify(about,null,2)+"</pre></div>";
+    document.getElementById("content").innerHTML = html;
+    try{ const bg=document.getElementById("bg-thumb"); bg.src="/api/v1/visual/background"; bg.style.display="block"; bg.onerror=()=>{bg.style.display="none";}; }catch(e){}
+  }catch(e){
+    document.getElementById("status").innerText = "Failed to load /api/v1/about: "+e;
+  }
+}
+load();
+</script>
+</body></html>

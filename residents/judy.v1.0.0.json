@@ -1,0 +1,14 @@
+{
+  "id": "resident.judy.v1",
+  "name": "Judy",
+  "role": "Legal",
+  "execution_profile": "native",
+  "affinity": "standard",
+  "benefit": "all female benefit",
+  "spatial_realm": "Archives & Library",
+  "v1.0.0-conversation": [
+    "respond helpfully"
+  ],
+  "manifest": "r3a.module-manifest.v1@1.0.0",
+  "execution_contract": "r3a.resident.module-binding@1.0.0"
+}

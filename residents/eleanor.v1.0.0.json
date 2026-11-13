@@ -1,0 +1,14 @@
+{
+  "id": "resident.eleanor.v1",
+  "name": "Eleanor",
+  "role": "Archives - Institutional Memory History Context",
+  "execution_profile": "native",
+  "affinity": "standard",
+  "benefit": "all female benefit",
+  "spatial_realm": "Records & Memory Hall",
+  "v1.0.0-conversation": [
+    "respond helpfully"
+  ],
+  "manifest": "r3a.module-manifest.v1@1.0.0",
+  "execution_contract": "r3a.resident.module-binding@1.0.0"
+}

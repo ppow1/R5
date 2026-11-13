@@ -1,0 +1,18 @@
+[Unit]
+Description=Riverview 5 System D - Ring Zero - Bare metal guardian
+After=network.target
+Wants=network.target
+# Runs on Camarillo N95 15W always-on
+
+[Service]
+Type=simple
+User=riverview
+WorkingDirectory=/opt/riverview/r5-full
+ExecStart=/usr/bin/python3 system_d/ring0.py
+Restart=always
+RestartSec=10
+Environment=PYTHONUNBUFFERED=1
+
+# Always on - even when OctoMiners sleep via Wake-on-LAN
+[Install]
+WantedBy=multi-user.target

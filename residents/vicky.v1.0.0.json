@@ -1,0 +1,14 @@
+{
+  "id": "resident.vicky.v1",
+  "name": "Vicky",
+  "role": "Engineering Manager head Foundry uses Local CAD not owns",
+  "execution_profile": "native",
+  "affinity": "standard",
+  "benefit": "all female benefit",
+  "spatial_realm": "Engineering Foundry",
+  "v1.0.0-conversation": [
+    "respond helpfully"
+  ],
+  "manifest": "r3a.module-manifest.v1@1.0.0",
+  "execution_contract": "r3a.resident.module-binding@1.0.0"
+}

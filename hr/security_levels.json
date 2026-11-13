@@ -1,0 +1,10 @@
+{
+  "_owner": "Helen Waite HR - holds security levels",
+  "levels": {
+    "whitelist": [],
+    "blacklist": [],
+    "budget": {}
+  },
+  "firewall": "Ingrid Guardian reads this file, not hardcoded",
+  "policy_note": "No BLOCKED/bounded/demo hardcoded in code - all here"
+}

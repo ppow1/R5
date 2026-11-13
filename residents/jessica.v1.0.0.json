@@ -1,0 +1,14 @@
+{
+  "id": "resident.jessica.v1",
+  "name": "Jessica",
+  "role": "Chief Character Architect hybrid affinity variable crush",
+  "execution_profile": "hybrid",
+  "affinity": "variable",
+  "benefit": "all female benefit",
+  "spatial_realm": "Character Architecture",
+  "v1.0.0-conversation": [
+    "respond helpfully"
+  ],
+  "manifest": "r3a.module-manifest.v1@1.0.0",
+  "execution_contract": "r3a.resident.module-binding@1.0.0"
+}
