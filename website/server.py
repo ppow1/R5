@@ -247,17 +247,17 @@ async def invoke_operation(request: Request):
         obs = sock.observe(op)
         grant = sock.dispatch(op, task_class)
         ledger.append_event({"type":"operation_invoke","request": op,"grant": dict(grant),"task_class": task_class})
-        # v27f2 FIX - return real Grace 80B directly, unwrap grace-80b
+        # v27f3 FIX - return real Grace 80B directly, unwrap grace-80b - var is grant not cme_result
         try:
-            if isinstance(cme_result, dict):
-                inner = cme_result.get('result', {}) if isinstance(cme_result.get('result'), dict) else {}
+            if isinstance(grant, dict):
+                inner = grant.get('result', {}) if isinstance(grant.get('result'), dict) else {}
                 if inner.get('mode') == 'grace-80b':
-                    return cme_result
-                if cme_result.get('contract') == 'r3a.steward-operation-result.v1':
-                    return cme_result
+                    return grant
+                if grant.get('contract') == 'r3a.steward-operation-result.v1':
+                    return grant
         except Exception:
             pass
-        return cme_result
+        return grant
     except Exception as e:
         return JSONResponse(status_code=500, content={"contract":"r3a.steward-operation-result.v1","error":{"code":"dispatch_failed","message": str(e)[:2000] if isinstance(e, (str, Exception)) else str(type(e).__name__)+": "+str(e)[:1900]},"correlation_id": f"r5-err-{int(time.time())}"})
 
