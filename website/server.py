@@ -247,19 +247,17 @@ async def invoke_operation(request: Request):
         obs = sock.observe(op)
         grant = sock.dispatch(op, task_class)
         ledger.append_event({"type":"operation_invoke","request": op,"grant": dict(grant),"task_class": task_class})
-        # v27f unwrap - if CME already returned grace-80b, return it directly, not lightweight wrapper
+        # v27f2 FIX - return real Grace 80B directly, unwrap grace-80b
         try:
-            # cme_result is from cme/socket.py dispatch() - it already is r3a.steward-operation-result.v1 with mode grace-80b
-            if isinstance(cme_result, dict) and cme_result.get("result", {}).get("mode") == "grace-80b":
-                # Return real Grace text directly
-                return cme_result
-            if isinstance(cme_result, dict) and cme_result.get("contract") == "r3a.steward-operation-result.v1":
-                # Already correct contract - return as-is
-                return cme_result
-        except Exception as _unwrap_e:
+            if isinstance(cme_result, dict):
+                inner = cme_result.get('result', {}) if isinstance(cme_result.get('result'), dict) else {}
+                if inner.get('mode') == 'grace-80b':
+                    return cme_result
+                if cme_result.get('contract') == 'r3a.steward-operation-result.v1':
+                    return cme_result
+        except Exception:
             pass
-        # Fallback lightweight only if CME failed
-        return cme_result if isinstance(cme_result, dict) else {"contract":"r3a.steward-operation-result.v1","status":"completed","result":{"mode":"grace-80b","message":str(cme_result),"text":str(cme_result)}},"observation": dict(obs)}
+        return cme_result
     except Exception as e:
         return JSONResponse(status_code=500, content={"contract":"r3a.steward-operation-result.v1","error":{"code":"dispatch_failed","message": str(e)[:2000] if isinstance(e, (str, Exception)) else str(type(e).__name__)+": "+str(e)[:1900]},"correlation_id": f"r5-err-{int(time.time())}"})
 
@@ -567,6 +565,5 @@ async def steward_send_message(conv_id: str, request: Request):
     except:
         pass
     return {'contract':'r3a.steward-workspace-web.v1','message':grace_msg,'messages':GRACE_STORE[conv_id_store],'freshness':'current','correlation_id':f"r5-msg-{int(time.time())}"}
-
 
 
