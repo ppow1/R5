@@ -1,7 +1,7 @@
 {
   "id": "chloe",
-  "display_name": "Chloe",
-  "role": "Resident",
+  "display_name": "Chloe - Chief Architect",
+  "role": "Chief Architect",
   "contract": "r3a.resident.dossier.v1",
   "version": "1.0.0",
   "epistemic_config": {
@@ -17,5 +17,7 @@
   },
   "proven": true,
   "manifest": "r3a.module-manifest.v1@1.0.0",
-  "execution_contract": "r3a.resident.module-binding@1.0.0"
+  "execution_contract": "r3a.resident.module-binding@1.0.0",
+  "title": "Chief Architect",
+  "short_title": "Chief Architect"
 }

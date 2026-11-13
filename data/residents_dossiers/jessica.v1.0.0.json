@@ -1,7 +1,7 @@
 {
   "id": "jessica",
-  "display_name": "Jessica",
-  "role": "Resident Personality Writer",
+  "display_name": "Jessica - Chief Character",
+  "role": "Chief Character",
   "contract": "r3a.resident.dossier.v1",
   "version": "1.0.0",
   "epistemic_config": {
@@ -26,5 +26,7 @@
       "flirtatious"
     ],
     "writes": "resident-character-package.v1.json -> approved-character-context.v2.schema.json -> runtime-character-context.v1.json -> epistemic-span.v1.schema.json"
-  }
+  },
+  "title": "Chief Character",
+  "short_title": "Chief Character"
 }

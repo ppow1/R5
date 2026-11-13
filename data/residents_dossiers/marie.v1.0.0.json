@@ -1,7 +1,7 @@
 {
   "id": "marie",
-  "display_name": "Marie",
-  "role": "Research Auditor - Research Grove",
+  "display_name": "Marie - Research",
+  "role": "Research",
   "contract": "r3a.resident.dossier.v1",
   "version": "1.0.0",
   "epistemic_config": {
@@ -19,5 +19,7 @@
   "manifest": "r3a.module-manifest.v1@1.0.0",
   "execution_contract": "r3a.resident.module-binding@1.0.0",
   "spatial": "Research Grove Marie",
-  "department": "Research"
+  "department": "Research",
+  "title": "Research",
+  "short_title": "Research"
 }

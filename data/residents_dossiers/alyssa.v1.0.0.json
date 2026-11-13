@@ -1,14 +1,14 @@
 {
   "id": "alyssa",
-  "display_name": "Alyssa",
-  "role": "Chief of Staff / Administration - Great Courtyard gate, time shield",
+  "display_name": "Alyssa - Chief of Staff",
+  "role": "Chief of Staff",
   "contract": "r3a.resident.dossier.v1",
   "version": "1.0.0",
   "epistemic_config": {
     "enabled": true,
     "level": "balanced",
     "mode": "hybrid",
-    "reason": "alyssa uses balanced - Chief Staff time shield, Great Courtyard gate"
+    "reason": "alyssa uses balanced - Chief Staff time shield, Chief of Staff gate"
   },
   "modularity": {
     "layer": "plugin",
@@ -18,7 +18,8 @@
   "proven": true,
   "manifest": "r3a.module-manifest.v1@1.0.0",
   "execution_contract": "r3a.resident.module-binding@1.0.0",
-  "spatial": "Great Courtyard Alyssa gate",
   "department": "Administration",
-  "lifecycle": "active"
+  "lifecycle": "active",
+  "title": "Chief of Staff",
+  "short_title": "Chief of Staff"
 }

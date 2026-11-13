@@ -1,7 +1,7 @@
 {
   "id": "helen",
-  "display_name": "Helen",
-  "role": "HR / Steward Assistant",
+  "display_name": "Helen - HR",
+  "role": "HR",
   "contract": "r3a.resident.dossier.v1",
   "version": "1.0.0",
   "epistemic_config": {
@@ -17,5 +17,7 @@
   },
   "proven": true,
   "manifest": "r3a.module-manifest.v1@1.0.0",
-  "execution_contract": "r3a.resident.module-binding@1.0.0"
+  "execution_contract": "r3a.resident.module-binding@1.0.0",
+  "title": "HR",
+  "short_title": "HR"
 }

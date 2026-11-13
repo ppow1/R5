@@ -1,7 +1,7 @@
 {
   "id": "grace",
-  "display_name": "Grace",
-  "role": "Director of Operations",
+  "display_name": "Grace - Director Ops",
+  "role": "Director Ops",
   "contract": "r3a.resident.dossier.v1",
   "version": "1.0.0",
   "epistemic_config": {
@@ -42,5 +42,7 @@
   "db_tables": [
     "010_governed_knowledge",
     "011_resident_dossiers"
-  ]
+  ],
+  "title": "Director Ops",
+  "short_title": "Director Ops"
 }

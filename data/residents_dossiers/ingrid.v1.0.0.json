@@ -1,7 +1,7 @@
 {
   "id": "ingrid",
-  "display_name": "Ingrid",
-  "role": "Guardian / Security - Security Gatehouse firewall with Helen",
+  "display_name": "Ingrid - Security Chief",
+  "role": "Security Chief",
   "contract": "r3a.resident.dossier.v1",
   "version": "1.0.0",
   "epistemic_config": {
@@ -19,5 +19,7 @@
   "manifest": "r3a.module-manifest.v1@1.0.0",
   "execution_contract": "r3a.resident.module-binding@1.0.0",
   "spatial": "Security Gatehouse Ingrid+Helen",
-  "department": "Security"
+  "department": "Security",
+  "title": "Security Chief",
+  "short_title": "Security Chief"
 }
