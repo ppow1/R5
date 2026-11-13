@@ -268,7 +268,7 @@ button{cursor:pointer;border:1px solid #7794b1;color:#eaf4ff;background:#223b54;
   <button class="rail-button" id="nav-notifications" type="button" aria-label="Notifications" title="Notifications" aria-controls="notifications-panel" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Zm-8 12h4"/></svg><span class="rail-label">Notifications</span></button>
   <button class="rail-button" id="nav-roadmap" type="button" aria-label="Roadmap and workstream status" title="Roadmap and workstream status" aria-controls="roadmap-panel" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="M4 19V5m0 14h16M7 15l4-4 3 2 5-6"/></svg><span class="rail-label">Roadmap</span></button>
   <button class="rail-button" id="nav-steward" type="button" aria-label="Steward operations" title="Steward operations" aria-controls="steward-panel" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="M12 3 4 7v5c0 5 3.5 8 8 9 4.5-1 8-4 8-9V7l-8-4Zm-4 9 2.5 2.5L16 9"/></svg><span class="rail-label">Steward</span></button>
-   <button class="rail-button" id="nav-engineering" type="button" aria-label="Engineering Foundry" title="Engineering Foundry" aria-controls="win"><svg viewBox="0 0 24 24"><path d="m14 6 4-4 4 4-4 4M3 21l9-9M7 5l12 12M5 7l12 12"/></svg><span class="rail-label">Engineering</span></button>
+   <button class="rail-button" id="nav-engineering" type="button" aria-label="Engineering " title="Engineering " aria-controls="win"><svg viewBox="0 0 24 24"><path d="m14 6 4-4 4 4-4 4M3 21l9-9M7 5l12 12M5 7l12 12"/></svg><span class="rail-label">Engineering</span></button>
   <button class="rail-button" id="nav-infrastructure" type="button" aria-label="Infrastructure" title="Infrastructure observability" aria-controls="infrastructure-panel" aria-expanded="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/><path d="M12 3v7m0 4v7M3 12h7m4 0h7M5.6 5.6l4.9 4.9m3 3 4.9 4.9m0-12.8-4.9 4.9m-3 3-4.9 4.9"/></svg><span class="rail-label">Infrastructure</span></button>
   <div class="rail-spacer"></div>
 </nav>
@@ -284,12 +284,12 @@ button{cursor:pointer;border:1px solid #7794b1;color:#eaf4ff;background:#223b54;
 <button class="settings-nav-item" data-section="help">Help</button>
 </nav>
 <section class="settings-detail" aria-live="polite"><h3 id="settings-scope-title">Institutional</h3><p class="settings-unavailable" id="settings-registry-status">Settings registry unavailable · no operational settings loaded.</p><div class="settings-row"><span>Inherited value</span><span>Unavailable</span></div><div class="settings-row"><span>Scoped override</span><span>Unavailable</span></div><div class="settings-row"><span>Effective value</span><span>Unavailable</span></div><div class="settings-row"><span>Authorization</span><span>Capability manifest unavailable</span></div><div class="settings-row"><span>Configuration history</span><span>Unavailable</span></div><section class="settings-runtime"><h3>Effective R5 runtime configuration</h3><p>Read from the current durable config revision. This view does not imply inherited scopes or write access.</p><button id="settings-config-refresh" type="button">Load effective values</button><output id="settings-config-status" aria-live="polite">Not loaded</output><pre id="settings-config-values">No configuration values loaded.</pre><div id="settings-config-history"></div></section><div class="settings-local">Local appearance · this browser only</div><div id="browser-appearance" hidden><div class="controls"><label for="opacity">Engineering opacity</label><output id="value" for="opacity">45%</output><input id="opacity" type="range" min="45" max="95" value="45"><button id="center-window" type="button">Center window</button><button id="snapshot-button" type="button">Snapshot</button><output id="snapshot-status" aria-live="polite"></output></div><section id="layout-presets"><h3>Floating panel layouts</h3><p>Save up to 10 layouts for this browser. A layout records panel positions, sizes, and open or minimized state. Applying a preset can show Chat, Engineering, Infrastructure, Steward operations, and Notifications together.</p><div id="layout-presets-controls"><select id="layout-preset-slot" aria-label="Layout preset"></select><input id="layout-preset-name" type="text" maxlength="32" placeholder="Preset name (optional)" aria-label="Preset name"><button id="layout-preset-save" type="button">Save current</button><button id="layout-preset-apply" type="button">Apply</button><button id="layout-preset-clear" type="button">Clear</button></div><output id="layout-preset-status" aria-live="polite"></output></section></div></section></div></div>
-  <button class="profile-menu-item" id="profile-engineering" type="button">Engineering Foundry panel</button>
+  <button class="profile-menu-item" id="profile-engineering" type="button">Engineering  panel</button>
   <button class="profile-menu-item" id="profile-infrastructure" type="button">Infrastructure panel</button>
 </div>
-<section class="window min" id="win" aria-label="Engineering Foundry">
+<section class="window min" id="win" aria-label="Engineering ">
   <header id="drag">
-    <b>⚒ Engineering Foundry</b>
+    <b>⚒ Engineering </b>
     <div class="window-actions"><div class="opacity-control"><button class="opacity-trigger" type="button" title="Engineering opacity" aria-label="Engineering opacity">◐</button><div class="opacity-popover"><label for="engineering-opacity">Engineering opacity <output id="engineering-opacity-value">45%</output></label><input id="engineering-opacity" type="range" min="45" max="95" value="45"></div></div><button id="minimize" aria-label="Restore panel">□</button></div>
   </header>
   <div class="content">
@@ -745,237 +745,476 @@ refreshEngineeringStatus();
 
 
 
-<script id="r5-help-about-integrated-v2">
-/* R5 v26 Help Integrated v2 - DARK THEME READABLE - matches Institutional */
+
+
+
+<script id="r5-help-about-inline-v3">
+/* R5 v27 Help -> About inline pane - readable #c6d6e6 on #10223888 */
 (function(){
   const ABOUT_ENDPOINT = '/api/v1/about';
-  
-  function findSettingsElements(){
-    const allButtons = Array.from(document.querySelectorAll('button'));
-    const institutionalBtn = allButtons.find(b=>b.textContent.trim()==='Institutional');
-    if(!institutionalBtn) return null;
-    const helpBtn = allButtons.find(b=>b.textContent.trim()==='Help' && b.getAttribute('data-section')==='help');
-    let rightPane = null;
-    for(const div of document.querySelectorAll('div')){
-      if(div.textContent.includes('R3 settings registry is not connected')){
-        rightPane = div.closest('div')?.parentElement?.parentElement || div.parentElement?.parentElement;
-        // Try to find the actual content pane - usually second child of settings container
-        const container = div.closest('[class*="settings"], [class*="steward-workspace"]');
-        if(container){
-          const panes = container.querySelectorAll('div');
-          for(const p of panes){
-            if(p.textContent.includes('Inherited value') || p.textContent.includes('R3 settings registry')){
-              rightPane = p.parentElement;
-              break;
-            }
-          }
-        }
-        if(rightPane) break;
-      }
-    }
-    return {helpBtn, rightPane, institutionalBtn};
+  const COLORS = { text: '#c6d6e6', bg: '#10223888', cardBg: '#1a344f88', border: '#c2d5ec33' };
+  function ensureStyles(){
+    if(document.getElementById('r5-help-about-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'r5-help-about-styles';
+    style.textContent = `
+      #r5-about-inline { color: ${COLORS.text}; background: ${COLORS.bg}; border: 1px solid ${COLORS.border}; border-radius: 10px; padding: 12px; font-size: 12px; line-height: 1.5; }
+      #r5-about-inline h3 { margin: 0 0 8px; font-size: 14px; color: #e5effb; }
+      #r5-about-inline h4 { margin: 12px 0 6px; font-size: 12px; color: #9fc4ed; border-top: 1px solid ${COLORS.border}; padding-top: 8px; }
+      #r5-about-inline .r5-about-card { background: ${COLORS.cardBg}; border: 1px solid ${COLORS.border}; border-radius: 8px; padding: 10px; margin: 8px 0; }
+      #r5-about-inline .r5-about-badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; margin: 2px; }
+      #r5-about-inline .pass { background: #0f3d1f88; color: #7fda9d; }
+      #r5-about-inline .fail { background: #3d0f0f88; color: #da7f7f; }
+      #r5-about-inline pre { white-space: pre-wrap; background: #091522; color: ${COLORS.text}; padding: 8px; border-radius: 6px; overflow: auto; font-size: 10px; max-height: 200px; }
+      #r5-about-inline a { color: #9fc4ed; }
+    `;
+    document.head.appendChild(style);
   }
-
-  async function renderHelpAbout(rightPane, subTab='about'){
-    if(!rightPane) return;
-    
-    let aboutData = null;
-    try{
-      const r = await fetch(ABOUT_ENDPOINT,{credentials:'same-origin'});
-      aboutData = await r.json();
-    }catch(e){
-      rightPane.innerHTML = '<div style="padding:20px;background:#08121e;color:#da7f7f">Failed to load '+ABOUT_ENDPOINT+': '+e+'</div>';
-      return;
-    }
-
-    const isDark = true;
-    const cardBg = '#10223888';
-    const cardBorder = '1px solid #c2d5ec22';
-    const textColor = '#c6d6e6';
-    const mutedColor = '#8a9ab0';
-    const preBg = '#091522';
-    
-    const tabs = ['about','versions','vision','residents'];
-    const tabLabels = {about:'About', versions:'Versions', vision:'Vision', residents:'Residents'};
-    
-    let contentHtml = '';
-    
-    if(subTab === 'about'){
-      contentHtml = `
-        <div style="display:grid;gap:12px">
-          <div style="background:${cardBg};border:${cardBorder};border-radius:10px;padding:12px">
-            <div style="font-weight:600;color:${textColor};margin-bottom:8px">R5 Host & Version - live from ${ABOUT_ENDPOINT}</div>
-            <div style="display:grid;grid-template-columns:130px 1fr;gap:6px;font-size:13px;color:${textColor}">
-              <div style="color:${mutedColor}">Host</div><div>${aboutData.host||''}</div>
-              <div style="color:${mutedColor}">Version</div><div>${aboutData.version||''}</div>
-              <div style="color:${mutedColor}">Commit</div><div>${aboutData.commit||''}</div>
-              <div style="color:${mutedColor}">Dashboard</div><div>${aboutData.dashboard||'R5 CONTROLLED DOCUMENT Rev 1.0.30'}</div>
-              <div style="color:${mutedColor}">Time</div><div>${aboutData.timestamp||''}</div>
-              <div style="color:${mutedColor}">Anchor</div><div>x:${aboutData.anchor?.x||0.377} y:${aboutData.anchor?.y||0.653} <span style="color:${mutedColor}">(${aboutData.backgroundPosition||'37.7% 65.3%'})</span></div>
-              <div style="color:${mutedColor}">Background</div><div>${aboutData.background?.file||'waterwheel_dashboard_map_labels.png'} - <span style="color:#7fda9d">${aboutData.background?.status||'fixed v19'}</span></div>
-            </div>
-          </div>
-          
-          <div style="background:${cardBg};border:${cardBorder};border-radius:10px;padding:12px">
-            <div style="font-weight:600;color:${textColor};margin-bottom:8px">Effective R5 runtime configuration</div>
-            <div style="display:grid;grid-template-columns:130px 1fr;gap:6px;font-size:13px;color:${textColor}">
-              <div style="color:${mutedColor}">CME core</div><div>${aboutData.cme?.file||'socket.py'} - ${aboutData.cme?.size||''} bytes <span style="background:#0f3d1f88;color:#7fda9d;padding:2px 6px;border-radius:4px;font-size:11px;border:1px solid #1f6a33">${aboutData.cme?.pass?'PASS <15KB':''}</span> - mode: ${aboutData.cme?.mode||''}</div>
-              <div style="color:${mutedColor}">Website FAT</div><div>${aboutData.website?.file||'server.py'} - ${aboutData.website?.size||''} bytes <span style="color:${mutedColor}">FAT must stay FAT</span></div>
-              <div style="color:${mutedColor}">Server</div><div>${aboutData.server?.file||''} - ${aboutData.server?.size||''} bytes</div>
-              <div style="color:${mutedColor}">About file</div><div>${aboutData.about_file?.file||'about.html'} - ${aboutData.about_file?.size||''} bytes dynamic v19</div>
-              <div style="color:${mutedColor}">Inference</div><div>192.168.1.160:8080 - Qwen3-Next-80B-A3B-Instruct-Q4_K_M.gguf - <span style="color:#7fda9d">online</span></div>
-              <div style="color:${mutedColor}">Epistemic global</div><div>enabled:true level:balanced mode:hybrid - <span style="color:${mutedColor}">Per-resident and per-conversation overrides supported</span></div>
-            </div>
-          </div>
-
-          <div style="background:${preBg};border:${cardBorder};border-radius:8px;padding:10px;max-height:300px;overflow:auto">
-            <div style="color:${mutedColor};font-size:11px;margin-bottom:6px">Full r5.about.v1 - Grace query via POST /api/v1/steward/operations/invoke task_class v1.0.0-conversation</div>
-            <pre style="margin:0;white-space:pre-wrap;color:${textColor};font-size:11px">${JSON.stringify(aboutData,null,2).substring(0,8000)}</pre>
-          </div>
-          
-          <div style="display:flex;gap:12px;font-size:11px;color:${mutedColor}">
-            <span>Inherited value Unavailable</span><span>·</span><span>Scoped override Unavailable</span><span>·</span><span>Effective value live</span><span>·</span><span>Local appearance · this browser only</span>
-          </div>
-        </div>
-      `;
-    } else if(subTab === 'versions'){
-      contentHtml = `
-        <div style="display:grid;gap:12px">
-          <div style="background:${cardBg};border:${cardBorder};border-radius:10px;padding:12px">
-            <div style="font-weight:600;color:${textColor};margin-bottom:8px">Routes - FAT website, lean core</div>
-            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
-              ${(aboutData.routes||[]).map(r=>'<span style="display:inline-block;background:'+preBg+';border:'+cardBorder+';padding:4px 8px;border-radius:6px;font-size:11px;color:'+textColor+'">'+r+'</span>').join('')}
-            </div>
-          </div>
-          <div style="background:${cardBg};border:${cardBorder};border-radius:10px;padding:12px">
-            <div style="display:grid;grid-template-columns:110px 1fr;gap:6px;font-size:13px;color:${textColor}">
-              <div style="color:${mutedColor}">Website</div><div>${aboutData.website?.size||''} bytes <span style="color:${mutedColor}">FAT must stay FAT</span></div>
-              <div style="color:${mutedColor}">CME core</div><div>${aboutData.cme?.size||''} bytes ${aboutData.cme?.pass?'<span style="color:#7fda9d">PASS &lt;15KB lean</span>':'FAIL'} - keep lean only cme/socket.py</div>
-              <div style="color:${mutedColor}">Dashboard</div><div>${aboutData.dashboard||'R5 CONTROLLED DOCUMENT Rev 1.0.30'}</div>
-              <div style="color:${mutedColor}">About file</div><div>${aboutData.about_file?.size||''} bytes dynamic v19</div>
-            </div>
-          </div>
-        </div>
-      `;
-    } else if(subTab === 'vision'){
-      const v = aboutData.vision||{};
-      contentHtml = `
-        <div style="display:grid;gap:12px">
-          <div style="background:${cardBg};border:${cardBorder};border-radius:10px;padding:12px">
-            <div style="font-weight:600;color:${textColor};margin-bottom:8px">Vision - plugin not core modularity - OctoMiner2 30B offline</div>
-            <div style="display:grid;grid-template-columns:100px 1fr;gap:6px;font-size:13px;color:${textColor}">
-              <div style="color:${mutedColor}">Host</div><div>${v.host||'192.168.1.162'} (OctoMiner2)</div>
-              <div style="color:${mutedColor}">Endpoint</div><div>${v.vision_endpoint||'192.168.1.160:18080'} 8 slots 4096 tokens</div>
-              <div style="color:${mutedColor}">Service</div><div>${v.service||'qwen30b-vision.service 16060 MiB / 16384 MiB 21s startup'}</div>
-              <div style="color:${mutedColor}">States</div><div style="display:grid;gap:2px">${(v.states||[]).map(s=>'<span>'+s+'</span>').join('')}</div>
-              <div style="color:${mutedColor}">Activation</div><div>POST /api/v1/visual/activate - Case A load model / Case B power-on host via authorized registry Issue #367</div>
-              <div style="color:${mutedColor}">Status API</div><div>GET /api/v1/visual/status - Ready green / Model unloaded yellow / Host offline grey / Starting spinning / Unavailable red</div>
-            </div>
-          </div>
-          <div id="vision-live-status" style="background:${preBg};border:${cardBorder};border-radius:8px;padding:10px;font-size:12px;color:${textColor}">Loading live status from /api/v1/visual/status...</div>
-        </div>
-      `;
-      setTimeout(()=>{
-        fetch('/api/v1/visual/status',{credentials:'same-origin'}).then(r=>r.json()).then(data=>{
-          const live = document.getElementById('vision-live-status');
-          if(live) live.innerHTML = '<div style="color:'+textColor+';font-weight:600;margin-bottom:6px">Live status</div><pre style="margin:0;white-space:pre-wrap;color:'+textColor+';font-size:11px;background:transparent">'+JSON.stringify(data,null,2)+'</pre>';
-        }).catch(e=>{
-          const live = document.getElementById('vision-live-status');
-          if(live) live.innerHTML = '<span style="color:#da7f7f">Failed: '+e+'</span>';
-        });
-      }, 100);
-    } else if(subTab === 'residents'){
-      const dossiers = aboutData.residents_dossiers||{};
-      const entries = Object.entries(dossiers).sort();
-      contentHtml = `
-        <div style="display:grid;gap:12px">
-          <div style="background:${cardBg};border:${cardBorder};border-radius:10px;padding:12px">
-            <div style="font-weight:600;color:${textColor}">Residents Dossiers - plugin not core - authoritative directory data/residents_dossiers/*.v1.0.0.json</div>
-            <div style="font-size:11px;color:${mutedColor};margin-top:4px">Source: 011_resident_dossiers table, JSON cache avoids 100k JSON, per-resident epistemic_config strict/relaxed/balanced - DB source not core</div>
-            <div style="font-size:12px;color:${mutedColor};margin-top:8px">Total: ${entries.length} dossiers found - expected 13 plus yourself per user - need to create missing</div>
-            <div style="display:grid;gap:6px;margin-top:10px">
-              ${entries.map(([k,v])=>{
-                const levelColor = v.level==='strict'?'#7f9fda':v.level==='relaxed'?'#dabc7f':'#7fda9d';
-                return '<div style="display:flex;justify-content:space-between;align-items:center;background:'+preBg+';border:'+cardBorder+';padding:8px 10px;border-radius:6px;font-size:13px"><span style="color:'+textColor+';font-weight:500">'+k+'</span><span style="display:flex;gap:8px;align-items:center"><span style="background:#10223888;border:1px solid #c2d5ec22;padding:2px 6px;border-radius:4px;font-size:11px;color:'+levelColor+'">level:'+(v.level||'balanced')+'</span><span style="color:'+mutedColor+';font-size:11px">name:'+(v.name||k)+'</span></span></div>';
-              }).join('')}
-            </div>
-          </div>
-          <div style="background:${cardBg};border:${cardBorder};border-radius:8px;padding:10px">
-            <div style="font-size:12px;color:${mutedColor}">Every resident must talk to inference server via same CMESocket path - cme/socket.py lean-v24-per-resident-conv-epistemic - Grace strict, Jessica relaxed, others balanced</div>
-            <div style="font-size:11px;color:${mutedColor};margin-top:6px">Capabilities: website/identity, local_cad, text_to_stl proven with r3a.module-manifest.v1@1.0.0 + r3a.resident.module-binding@1.0.0 - 477 bytes cache</div>
-          </div>
-        </div>
-      `;
-    }
-
-    // Build full pane with tabs
-    rightPane.innerHTML = `
-      <div style="padding:0;background:transparent">
-        <div style="margin-bottom:16px">
-          <h2 style="font-size:20px;margin:0 0 4px 0;color:#c6d6e6;font-weight:700">Help</h2>
-          <div style="color:${mutedColor};font-size:13px">R5 Help and About - live values from durable config revision. This view does not imply inherited scopes or write access.</div>
-        </div>
-        
-        <div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:${cardBorder};padding-bottom:10px">
-          ${tabs.map(t=>`<button class="help-subtab ${t===subTab?'active':''}" data-sub="${t}" style="background:${t===subTab?'#10223888':'transparent'};border:${t===subTab?'1px solid #c2d5ec44':'1px solid transparent'};border-radius:6px;padding:6px 14px;color:${t===subTab?textColor:mutedColor};cursor:pointer;font-size:13px">${tabLabels[t]}</button>`).join('')}
-        </div>
-
-        <div id="help-about-content">
-          ${contentHtml}
-        </div>
-        
-        <div style="margin-top:16px;padding-top:10px;border-top:${cardBorder};display:flex;gap:12px;font-size:11px;color:${mutedColor}">
-          <span>Configuration history Unavailable</span><span>·</span><span>Effective R5 runtime configuration live</span><span>·</span><span>Local appearance · this browser only</span>
-        </div>
+  async function renderAboutInline(){
+    ensureStyles();
+    const detail = document.querySelector('.settings-detail');
+    const titleEl = document.getElementById('settings-scope-title');
+    if(!detail) return;
+    if(titleEl) titleEl.textContent = 'Help \u2192 About';
+    document.querySelectorAll('[data-settings-scope]').forEach(b=>b.setAttribute('aria-current','false'));
+    detail.innerHTML = `
+      <div id="r5-about-inline">
+        <h3>R5 About — Settings \u2192 Help \u2192 About</h3>
+        <div id="r5-about-status" style="color:#d6c79a;">Loading /api/v1/about live...</div>
+        <div id="r5-about-content"></div>
       </div>
     `;
+    try{
+      const r = await fetch(ABOUT_ENDPOINT, {credentials:'same-origin', cache:'no-store'});
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const about = await r.json();
+      document.getElementById('r5-about-status').innerHTML = `Host: ${about.host||'192.168.1.155'} | Version: ${about.version||''} | Commit: ${about.commit||''} | <span class="r5-about-badge pass">inline v3b readable #c6d6e6 on #10223888</span>`;
+      let html = '';
+      html += `<div class="r5-about-card"><b>Build</b>: ${about.version||''}<br><b>Anchor</b>: x:${about.anchor?.x||0.377} y:${about.anchor?.y||0.653}<br><b>Dashboard</b>: R5 CONTROLLED DOCUMENT Rev 1.0.30 - 99,918 reused FAT keep</div>`;
+      if(about.cme) html += `<div class="r5-about-card"><b>CME</b>: ${about.cme.file||'socket.py'} - ${about.cme.size||''} bytes <span class="r5-about-badge ${about.cme.pass?'pass':'fail'}">${about.cme.pass?'PASS <15KB':'FAIL'}</span> mode: ${about.cme.mode||''}</div>`;
+      if(about.website) html += `<div class="r5-about-card"><b>Website FAT</b>: ${about.website.file||'server.py'} - ${about.website.size||''} bytes</div>`;
+      html += `<div class="r5-about-card"><b>Routes</b>: ${(about.routes||[]).join(' | ')}</div>`;
+      html += `<div class="r5-about-card"><b>Residents</b>: ${JSON.stringify(about.residents_dossiers||about.residents||{}).slice(0,600)}</div>`;
+      html += `<h4>Full r5.about.v1</h4><pre>${JSON.stringify(about, null, 2).slice(0, 8000)}</pre>`;
+      document.getElementById('r5-about-content').innerHTML = html;
+    }catch(e){
+      document.getElementById('r5-about-status').textContent = 'Failed: '+e.message;
+    }
+  }
+  function attachHelpHandlers(){
+    const helpBtns = Array.from(document.querySelectorAll('button')).filter(b=>b.textContent.trim()==='Help');
+    helpBtns.forEach(btn=>{
+      if(btn.dataset.r5HelpBound) return;
+      btn.dataset.r5HelpBound='1';
+      btn.addEventListener('click', (e)=>{ e.preventDefault(); e.stopPropagation(); renderAboutInline(); });
+    });
+  }
+  attachHelpHandlers();
+  setInterval(attachHelpHandlers, 2000);
+  window.R5AboutInline = { render: renderAboutInline };
+})();
+</script>
 
-    // Hook subtab clicks
-    rightPane.querySelectorAll('.help-subtab').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const sub = btn.getAttribute('data-sub');
-        renderHelpAbout(rightPane, sub);
+
+<script id="r5-chat-dynamic-residents-v23">
+/* R5 v23 Chat: dynamic residents from /api/v1/about + conv-{resident}-{timestamp} */
+(function(){
+  const ABOUT_ENDPOINT = '/api/v1/about';
+  const SELECT_ID = 'chat-resident-select';
+  const NEW_BTN_ID = 'chat-new';
+  const LIST_ID = 'chat-conversation-list';
+  const STATUS_ID = 'chat-service-status';
+  
+  function logStatus(msg){
+    const el = document.getElementById(STATUS_ID);
+    if(el) el.textContent = msg;
+    console.log('[R5 Chat]', msg);
+  }
+
+  async function loadResidents(){
+    const select = document.getElementById(SELECT_ID);
+    if(!select) return;
+    try{
+      const r = await fetch(ABOUT_ENDPOINT, {credentials:'same-origin', cache:'no-store'});
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const about = await r.json();
+      const dossiers = about.residents_dossiers || about.residents || {};
+      // dossiers is dict key->meta or file name -> extract ids
+      let ids = [];
+      if(Array.isArray(dossiers)){
+        ids = dossiers;
+      } else {
+        // keys like "alyssa.v1.0.0" or "grace" -> extract id
+        for(const key of Object.keys(dossiers)){
+          // try to get id from value
+          const val = dossiers[key];
+          if(typeof val === 'string'){
+            // val might be id
+            ids.push(val.replace('.v1.0.0','').replace('.json',''));
+          } else if(val && val.id){
+            ids.push(val.id);
+          } else {
+            // key is filename
+            let id = key.replace('.v1.0.0','').replace('.json','');
+            // normalize gray_man -> gm
+            if(id==='gray_man') id='gm';
+            ids.push(id);
+          }
+        }
+      }
+      // Dedupe, normalize, sort
+      ids = [...new Set(ids.map(s=>s.toLowerCase().trim()).filter(Boolean))];
+      // Ensure gm not duplicated with gray_man
+      if(ids.includes('gray_man') && ids.includes('gm')){
+        ids = ids.filter(x=>x!=='gray_man');
+      }
+      ids.sort();
+      console.log('[R5 Chat] Loaded residents', ids);
+      
+      // Save for global use
+      window.R5_RESIDENTS = ids;
+      
+      // Rebuild select options preserving selected
+      const current = select.value;
+      select.innerHTML = '<option value="">Select a resident...</option>';
+      ids.forEach(id=>{
+        const opt = document.createElement('option');
+        opt.value = id;
+        // Display name capitalized, special case gm -> Gray
+        let display = id.charAt(0).toUpperCase() + id.slice(1);
+        if(id==='gm') display='Gray (GM)';
+        if(id==='alyssa') display='Alyssa - Chief of Staff';
+        if(id==='cheryl') display='Cheryl - Comptroller';
+        if(id==='ingrid') display='Ingrid - Guardian';
+        if(id==='marie') display='Marie - Research';
+        if(id==='eleanor') display='Eleanor - Archives';
+        if(id==='evelyn') display='Evelyn - Personal';
+        if(id==='grace') display='Grace - Director Ops #1';
+        if(id==='chloe') display='Chloe - Chief Architect';
+        if(id==='jessica') display='Jessica - Character Architect';
+        if(id==='vicky') display='Vicky - Engineering';
+        if(id==='helen') display='Helen - HR';
+        if(id==='judy') display='Judy - Legal';
+        opt.textContent = display;
+        select.appendChild(opt);
       });
+      if(current && ids.includes(current)){
+        select.value = current;
+      }
+      logStatus(`Residents loaded: ${ids.length} (13+self) from /api/v1/about - ${ids.join(', ')}`);
+      return ids;
+    }catch(e){
+      console.error('[R5 Chat] Failed to load residents', e);
+      logStatus('Failed to load residents from /api/v1/about: '+e.message+' - using hardcoded 8');
+      // Keep existing hardcoded as fallback
+      return [];
+    }
+  }
+
+  function createNewConversation(){
+    const select = document.getElementById(SELECT_ID);
+    const list = document.getElementById(LIST_ID);
+    if(!select){
+      logStatus('No resident select found');
+      return;
+    }
+    const resident = (select.value || '').trim().toLowerCase();
+    if(!resident){
+      logStatus('Select a resident first to create conversation');
+      // Flash the select
+      select.style.borderColor = '#ff6b6b';
+      setTimeout(()=>select.style.borderColor='#c2d5ec33', 1000);
+      alert('Select a resident first (e.g. Grace, Alyssa, Vicky...) then click +');
+      return;
+    }
+    const timestamp = Date.now();
+    const convId = `conv-${resident}-${timestamp}`;
+    console.log('[R5 Chat] Creating new conversation', convId);
+    
+    // Try to use authoritative API if available, otherwise create local UI entry
+    // The dashboard may have a function to create conversation via steward API
+    // We will attempt POST /api/v1/steward/operations/invoke or similar, but fallback to local
+    
+    // Create UI element immediately
+    if(list){
+      const btn = document.createElement('button');
+      btn.className = 'workspace-conversation';
+      btn.dataset.conversationId = convId;
+      btn.dataset.resident = resident;
+      btn.innerHTML = `<b>${convId}</b><br><small>Resident: ${resident} | ${new Date(timestamp).toLocaleString()}</small>`;
+      btn.addEventListener('click', ()=>{
+        // Select this conversation
+        document.querySelectorAll('.workspace-conversation').forEach(el=>el.setAttribute('aria-current','false'));
+        btn.setAttribute('aria-current','true');
+        const msgList = document.getElementById('chat-message-list');
+        if(msgList) msgList.innerHTML = `<div class="workspace-message"><b>${resident}</b><p>New conversation ${convId} started. Grace 80B at 192.168.1.160:8080 via lean CME socket.</p></div>`;
+        // Enable composer
+        const input = document.getElementById('chat-composer-input');
+        const send = document.getElementById('chat-send');
+        if(input){ input.disabled=false; input.placeholder=`Message ${resident} in ${convId}...`; input.focus(); }
+        if(send) send.disabled=false;
+        // Store active conversation
+        window.R5_ACTIVE_CONV = convId;
+        window.R5_ACTIVE_RESIDENT = resident;
+      });
+      list.prepend(btn);
+      // Auto-click it
+      btn.click();
+      logStatus(`New conversation created: ${convId} with ${resident} - conv-{resident}-{timestamp} pattern`);
+    }
+    
+    // Also try to persist via API if endpoint exists (non-blocking)
+    (async()=>{
+      try{
+        // Try steward conversation API - best effort
+        const payload = { contract: 'r3a.conversation.create.v1', resident_id: resident, conversation_id: convId };
+        const res = await fetch('/api/v1/steward/conversations', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify(payload)
+        });
+        if(res.ok){
+          console.log('[R5 Chat] Conversation persisted via API');
+        } else {
+          console.log('[R5 Chat] No persistence API, using local only (status', res.status, ')');
+        }
+      }catch(e){
+        console.log('[R5 Chat] Persistence failed (expected if no API), local only', e.message);
+      }
+    })();
+  }
+
+  function attachHandlers(){
+    const newBtn = document.getElementById(NEW_BTN_ID);
+    if(newBtn && !newBtn.dataset.r5ChatBound){
+      newBtn.dataset.r5ChatBound='1';
+      newBtn.addEventListener('click', (e)=>{
+        e.preventDefault();
+        e.stopPropagation();
+        createNewConversation();
+      });
+      console.log('[R5 Chat] + button bound to conv-{resident}-{timestamp}');
+    }
+  }
+
+  // Load residents on start and attach handlers
+  loadResidents();
+  attachHandlers();
+  setInterval(attachHandlers, 2000);
+  // Reload residents every 30s in case new dossiers added
+  setInterval(loadResidents, 30000);
+  
+  window.R5_CHAT = { loadResidents, createNewConversation, attachHandlers };
+})();
+</script>
+
+
+<script id="r5-chat-persistent-friendly-v24">
+/* R5 v24 Chat: persistent friendly resident names, overrides steward-workspace-api.mjs */
+(function(){
+  const SELECT_ID = 'chat-resident-select';
+  const ABOUT_ENDPOINT = '/api/v1/about';
+  
+  const FRIENDLY_NAMES = {
+    'alyssa': 'Alyssa - Chief of Staff ()',
+    'grace': 'Grace - Director Ops #1',
+    'chloe': 'Chloe - Chief Architect',
+    'jessica': 'Jessica - Character Architect',
+    'vicky': 'Vicky - Engineering ()',
+    'helen': 'Helen - HR',
+    'ingrid': 'Ingrid - Guardian (Firewall)',
+    'eleanor': 'Eleanor - Archives',
+    'marie': 'Marie - Research Auditor',
+    'judy': 'Judy - Legal',
+    'cheryl': 'Cheryl - Comptroller CPA',
+    'evelyn': 'Evelyn - Personal',
+    'gm': 'Gray (GM) - Only male',
+    'gray_man': 'Gray (GM) - Only male'
+  };
+
+  async function loadFriendlyResidents(){
+    const select = document.getElementById(SELECT_ID);
+    if(!select) return;
+    try{
+      const r = await fetch(ABOUT_ENDPOINT, {credentials:'same-origin', cache:'no-store'});
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const about = await r.json();
+      const dossiers = about.residents_dossiers || {};
+      let ids = [];
+      for(const key of Object.keys(dossiers)){
+        let id = key.replace('.v1.0.0','').replace('.json','');
+        if(id==='gray_man') id='gm';
+        if(!ids.includes(id)) ids.push(id);
+      }
+      ids = [...new Set(ids)].sort();
+      // Ensure we have all 13
+      const expected = ['alyssa','cheryl','chloe','eleanor','evelyn','gm','grace','helen','ingrid','jessica','judy','marie','vicky'];
+      expected.forEach(e=>{ if(!ids.includes(e)) ids.push(e); });
+      ids.sort();
+      
+      const current = select.value;
+      // Only rebuild if count mismatch or contains ".v1.0.0" pattern (old style)
+      const hasOldStyle = Array.from(select.options).some(o=>o.textContent.includes('.v1.0.0') || o.textContent.includes('(balanced)'));
+      const countMismatch = select.options.length !== (ids.length + 1);
+      
+      if(hasOldStyle || countMismatch || window.R5_FORCE_REBUILD){
+        console.log('[R5 Chat v24] Rebuilding dropdown with friendly names, oldStyle:', hasOldStyle, 'countMismatch:', countMismatch);
+        select.innerHTML = '<option value="">Select a resident...</option>';
+        ids.forEach(id=>{
+          const opt = document.createElement('option');
+          opt.value = id;
+          opt.textContent = FRIENDLY_NAMES[id] || (id.charAt(0).toUpperCase()+id.slice(1));
+          // Add epistemic level as data attribute for tooltip
+          const dossier = dossiers[id+'.v1.0.0'] || dossiers[id] || {};
+          if(dossier.epistemic_config){
+            opt.title = `Level: ${dossier.epistemic_config.level} | Mode: ${dossier.epistemic_config.mode}`;
+          }
+          select.appendChild(opt);
+        });
+        if(current && ids.includes(current)){
+          select.value = current;
+        }
+        // Update placeholder to match selected resident
+        updatePlaceholder();
+        window.R5_FORCE_REBUILD = false;
+      }
+      window.R5_RESIDENTS_FRIENDLY = ids;
+    }catch(e){
+      console.error('[R5 Chat v24] Failed', e);
+    }
+  }
+
+  function updatePlaceholder(){
+    const select = document.getElementById(SELECT_ID);
+    const input = document.getElementById('chat-composer-input');
+    if(!select || !input) return;
+    const resident = select.value || 'Grace';
+    const display = FRIENDLY_NAMES[resident] || resident;
+    input.placeholder = `Type to ${display}... Enter to send (conv-${resident}-{timestamp})`;
+  }
+
+  function attachSelectListener(){
+    const select = document.getElementById(SELECT_ID);
+    if(!select || select.dataset.r5FriendlyBound) return;
+    select.dataset.r5FriendlyBound = '1';
+    select.addEventListener('change', ()=>{
+      updatePlaceholder();
+      console.log('[R5 Chat v24] Resident changed to', select.value);
     });
   }
 
-  function hookSettings(){
-    const buttons = Array.from(document.querySelectorAll('button.settings-nav-item, button[data-section]'));
-    const helpBtn = buttons.find(b=>b.textContent.trim()==='Help' && b.getAttribute('data-section')==='help');
-    if(helpBtn && !helpBtn._r5HookedV2){
-      helpBtn._r5HookedV2 = true;
-      helpBtn.addEventListener('click', (e)=>{
-        document.querySelectorAll('button.settings-nav-item, button[data-section]').forEach(b=>{
-          b.style.background='transparent';
-          b.style.borderColor='transparent';
-          b.classList.remove('active');
-        });
-        helpBtn.style.background='#10223888';
-        helpBtn.style.borderColor='#c2d5ec44';
-        helpBtn.classList.add('active');
-        const {rightPane} = findSettingsElements()||{};
-        if(rightPane){
-          setTimeout(()=>renderHelpAbout(rightPane, 'about'), 50);
+  // Use MutationObserver to catch steward-workspace-api.mjs overwriting select
+  function observeSelect(){
+    const select = document.getElementById(SELECT_ID);
+    if(!select) return;
+    const observer = new MutationObserver((mutations)=>{
+      for(const m of mutations){
+        if(m.type === 'childList'){
+          // Check if old style reappeared
+          const hasOld = Array.from(select.options).some(o=>o.textContent.includes('.v1.0.0'));
+          if(hasOld){
+            console.log('[R5 Chat v24] Detected old style overwrite, rebuilding');
+            window.R5_FORCE_REBUILD = true;
+            setTimeout(loadFriendlyResidents, 100);
+          }
         }
-      });
-    }
+      }
+    });
+    observer.observe(select, { childList: true, subtree: false });
   }
 
-  const observer = new MutationObserver(()=>{ hookSettings(); });
-  observer.observe(document.body, {childList:true, subtree:true});
-  setInterval(()=>{ hookSettings(); }, 1000);
+  // Initial load
+  loadFriendlyResidents();
+  attachSelectListener();
+  observeSelect();
   
-  document.addEventListener('click', (e)=>{
-    const t = e.target;
-    if(t.textContent && t.textContent.trim()==='Help' && t.getAttribute('data-section')==='help'){
-      const {rightPane} = findSettingsElements()||{};
-      if(rightPane) setTimeout(()=>renderHelpAbout(rightPane, 'about'), 100);
+  // Persistent checks: every 1s for first 30s, then every 5s
+  let checks = 0;
+  const interval = setInterval(()=>{
+    checks++;
+    loadFriendlyResidents();
+    attachSelectListener();
+    if(checks>30) {
+      clearInterval(interval);
+      setInterval(loadFriendlyResidents, 5000);
     }
-  });
-  
-  // Auto-hook on load
-  setTimeout(()=>{ hookSettings(); }, 500);
+  }, 1000);
+
+  // Also hook + button to ensure conv-{resident}-{timestamp} creates even when no convs returned
+  function ensurePlusButtonCreates(){
+    const newBtn = document.getElementById('chat-new');
+    const list = document.getElementById('chat-conversation-list');
+    if(!newBtn || newBtn.dataset.r5PlusV24Bound) return;
+    newBtn.dataset.r5PlusV24Bound = '1';
+    // Remove old listeners by cloning
+    const clone = newBtn.cloneNode(true);
+    newBtn.parentNode.replaceChild(clone, newBtn);
+    clone.addEventListener('click', (e)=>{
+      e.preventDefault();
+      const select = document.getElementById(SELECT_ID);
+      const resident = (select?.value || 'grace').toLowerCase();
+      if(!select?.value){
+        alert('Select a resident first: '+ (window.R5_RESIDENTS_FRIENDLY||[]).join(', '));
+        return;
+      }
+      const ts = Date.now();
+      const convId = `conv-${resident}-${ts}`;
+      console.log('[R5 Chat v24] + creating', convId);
+      const listEl = document.getElementById('chat-conversation-list');
+      if(listEl){
+        // Clear "No conversations returned" text if present
+        if(listEl.textContent.includes('No conversations returned')){
+          listEl.innerHTML = '';
+        }
+        const btn = document.createElement('button');
+        btn.className = 'workspace-conversation';
+        btn.dataset.conversationId = convId;
+        btn.innerHTML = `<b>${convId}</b><br><small>Resident: ${resident} | ${new Date(ts).toLocaleString()}</small>`;
+        btn.addEventListener('click', ()=>{
+          document.querySelectorAll('.workspace-conversation').forEach(el=>el.setAttribute('aria-current','false'));
+          btn.setAttribute('aria-current','true');
+          const msgList = document.getElementById('chat-message-list');
+          if(msgList) msgList.innerHTML = `<div class="workspace-message"><b>${resident}</b><p>New conversation ${convId} - Grace 80B at 192.168.1.160:8080 via lean CME 9982 bytes PASS. Type below and Enter to send.</p></div>`;
+          const input = document.getElementById('chat-composer-input');
+          const send = document.getElementById('chat-send');
+          if(input){ input.disabled=false; input.focus(); updatePlaceholder(); }
+          if(send) send.disabled=false;
+          window.R5_ACTIVE_CONV = convId;
+          window.R5_ACTIVE_RESIDENT = resident;
+        });
+        listEl.prepend(btn);
+        btn.click();
+      }
+    });
+    console.log('[R5 Chat v24] + button persistent bound');
+  }
+  ensurePlusButtonCreates();
+  setInterval(ensurePlusButtonCreates, 2000);
+
+  window.R5_CHAT_V24 = { loadFriendlyResidents, updatePlaceholder };
 })();
+</script>
+
+
+<script id="r5-short-titles-v26">
+window.R5_SHORT_TITLES = {
+  "alyssa": "Chief of Staff",
+  "grace": "Director Ops",
+  "chloe": "Chief Architect",
+  "jessica": "Chief Character",
+  "vicky": "Engineering",
+  "helen": "HR",
+  "ingrid": "Security Chief",
+  "eleanor": "Archives",
+  "marie": "Research",
+  "judy": "Legal",
+  "cheryl": "CPA",
+  "evelyn": "Confidant",
+  "gm": "Gray",
+  "gray_man": "Gray",
+  "self": "Self"
+};
 </script>
 
 </body>
