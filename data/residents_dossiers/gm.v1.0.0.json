@@ -1,6 +1,6 @@
 {
   "id": "gm",
-  "display_name": "Gm - Gray",
+  "display_name": "GM - Gray",
   "role": "Gray",
   "contract": "r3a.resident.dossier.v1",
   "version": "1.0.0",
