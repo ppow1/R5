@@ -1,5 +1,22 @@
 """
-R5 CME Socket v35.3 MERGE DRAFT - FOR REVIEW, NOT DEPLOYED
+R5 CME Socket v35.4 MERGE DRAFT - FOR REVIEW, NOT DEPLOYED
+v35.3 + ledger completeness fix.
+- 2026-11-17 01:27 EST: Grace replied "hello again" in the dashboard
+  with correct time/personality, observe() appended the observation,
+  but no result entry ever appeared in ledger.jsonl (still 20 lines:
+  18 old + 1 direct-test entry + 1 observation). Audit of dispatch()
+  found only lines 450/476 append a result; returns at 357 (heartbeat),
+  373 (monitor-first local-fallback), 389 (direct tool_call), 404
+  (inference_error), 485 (except local-fallback) return without one.
+- Fix, in socket only, DDelta/loop/website unchanged: dispatch()
+  appends {"type": "result", ...} on every non-heartbeat return
+  (373, 389, 404, 485). Heartbeat-monitor (357) stays unappended,
+  per v35.3 - it fires every 5s and is not a conversation.
+- Caveat: this fixes dispatch-side gaps only. If the website chat
+  path bypasses dispatch() (its own 80B POST), the result still will
+  not be recorded - that is what the website-routes check (server.py
+  lines 240-275, 376-440, 530-620) must settle first. Do NOT deploy
+  until that check is pasted back.
 v35.2 + heartbeat noise fix.
 - DDelta runs every 5s with event {"type":"heartbeat",
   "task_class":"v1.0.0-conversation"}, no text, no resident work.
@@ -370,7 +387,8 @@ class CMESocket:
         _mon2 = self.monitor()
         if _mon2.get("status") != "online":
             fallback_msg2 = f"R5 v31 local {GRACE_SLOT}: {safe[:200]} (offline {_mon2.get('inference', 'unknown')})"
-            return {"contract": "r3a.steward-operation-result.v1", "correlation_id": f"r5-err-{int(time.time()*1000)}",
+            # v35.4: record local-fallback results too, not just toolcalled/notool.
+            _res373 = {"contract": "r3a.steward-operation-result.v1", "correlation_id": f"r5-err-{int(time.time()*1000)}",
                     "status": "local-fallback",
                     "result": {"mode": "grace-80b-local", "tool_mode": "grace-80b-local",
                                "message": fallback_msg2, "text": fallback_msg2, "resident": rid,
@@ -382,13 +400,18 @@ class CMESocket:
                               "resident_id": rid, "slot": alloc["slot"], "allocation": alloc,
                               "inference_error": str(_mon2.get("inference", "")), "autonomy": grant["autonomy"],
                               "distillation_hook": grant["distillation_hook"]}}
+            self._ledger_append({"type": "result", "data": _res373})
+            return _res373
         # v31/v29 direct tool execution path
         if isinstance(observation, dict) and observation.get("tool_call"):
             tc = observation["tool_call"]
             res = _exec_tool(tc.get("name"), tc.get("arguments", {}))
-            return {"contract": "r3a.grant.v1", "granted": True, "task_class": tclass,
+            # v35.4: record direct tool_call results too.
+            _res389 = {"contract": "r3a.grant.v1", "granted": True, "task_class": tclass,
                     "result": {"mode": "grace-80b", "tool_mode": "tool-result", "message": json.dumps(res),
                                "text": json.dumps(res), "resident": rid, "tool_result": res}, "grant": grant}
+            self._ledger_append({"type": "result", "data": _res389})
+            return _res389
         msgs = _build_msgs({"text": safe}, dos, display_name, role)
         headers = {"Content-Type": "application/json", "X-R5-Source": "camrui-155",
                    "X-R5-Slot": alloc["slot"], "X-R5-Resident": rid}
@@ -401,16 +424,29 @@ class CMESocket:
             data = resp.read()
             conn.close()
             if not (200 <= resp.status < 300):
-                return {"granted": False, "status": f"inference_error_{resp.status}",
+                # v35.4: record inference errors too, so a failed POST is visible in the ledger.
+                _res404 = {"granted": False, "status": f"inference_error_{resp.status}",
                         "error": data[:1000].decode(errors="ignore"), "grant": grant}
+                self._ledger_append({"type": "result", "data": _res404})
+                return _res404
             j = json.loads(data)
             choice = j["choices"][0] if "choices" in j and j["choices"] else {}
             msg = choice.get("message", {})
             text_out = msg.get("content", "") or ""
             tool_calls = msg.get("tool_calls", [])
             executed = []
-            # v31 two-step tool loop, verbatim
-            if tool_calls:
+            # v35.5 multi-turn tool loop: v31 was two-step only (first POST
+            # tool_calls, execute, second POST, return). If Grace tried to
+            # call a second tool in that second turn, its tool_calls were
+            # dropped and message came back empty. Loop up to 4 turns:
+            # each POST, execute its tool_calls, feed results back, repeat
+            # until a POST returns text with no tool_calls, or turns run out.
+            text_final = text_out
+            _turns = 0
+            _msgs = msgs
+            _msg = msg
+            while tool_calls and _turns < 4:
+                _turns += 1
                 tool_results = []
                 for tc in tool_calls:
                     fn = tc.get("function", {})
@@ -424,31 +460,34 @@ class CMESocket:
                     executed.append({"name": name, "result": res})
                     tool_results.append({"role": "tool", "tool_call_id": tc.get("id", f"call_{name}"),
                                          "name": name, "content": json.dumps(res)})
-                msgs2 = msgs + [msg] + tool_results
-                payload2 = {"model": self.model, "messages": msgs2, "tools": TOOLS_OPENAI,
+                _msgs = _msgs + [_msg] + tool_results
+                payload2 = {"model": self.model, "messages": _msgs, "tools": TOOLS_OPENAI,
                             "tool_choice": "auto", "max_tokens": 1024, "temperature": 0.7, "stream": False}
                 conn2 = http.client.HTTPConnection(self.host, self.port, timeout=35)
                 conn2.request("POST", self.path, body=json.dumps(payload2).encode(), headers=headers)
                 resp2 = conn2.getresponse()
                 data2 = resp2.read()
                 conn2.close()
-                if 200 <= resp2.status < 300:
-                    j2 = json.loads(data2)
-                    choice2 = j2["choices"][0] if "choices" in j2 and j2["choices"] else {}
-                    msg2 = choice2.get("message", {})
-                    text_final = msg2.get("content", "") or text_out
-                    result = {"contract": "r3a.steward-operation-result.v1", "correlation_id": f"r5-op-{int(time.time()*1000)}",
-                              "status": "completed",
-                              "result": {"mode": "grace-80b", "tool_mode": "grace-80b-v31-toolcalled",
-                                         "message": text_final, "text": text_final, "resident": rid,
-                                         "display_name": display_name, "role": role, "conversation_id": conv_id,
-                                         "slot": alloc["slot"], "allocation": alloc,
-                                         "tools_called": executed, "tools_discoverable": len(TOOLS_OPENAI),
-                                         "tool_registry": TOOL_NAMES, "epistemic_required": True,
-                                         "inference": {"host": self.host, "port": self.port, "model": self.model, "path": self.path}},
-                              "grant": grant}
-                    self._ledger_append({"type": "result", "data": result})
-                    return result
+                if not (200 <= resp2.status < 300):
+                    break
+                j2 = json.loads(data2)
+                choice2 = j2["choices"][0] if "choices" in j2 and j2["choices"] else {}
+                _msg = choice2.get("message", {})
+                text_final = _msg.get("content", "") or text_final
+                tool_calls = _msg.get("tool_calls", [])
+            if executed:
+                result = {"contract": "r3a.steward-operation-result.v1", "correlation_id": f"r5-op-{int(time.time()*1000)}",
+                          "status": "completed",
+                          "result": {"mode": "grace-80b", "tool_mode": "grace-80b-v31-toolcalled",
+                                     "message": text_final, "text": text_final, "resident": rid,
+                                     "display_name": display_name, "role": role, "conversation_id": conv_id,
+                                     "slot": alloc["slot"], "allocation": alloc,
+                                     "tools_called": executed, "tools_discoverable": len(TOOLS_OPENAI),
+                                     "tool_registry": TOOL_NAMES, "epistemic_required": True,
+                                     "inference": {"host": self.host, "port": self.port, "model": self.model, "path": self.path}},
+                          "grant": grant}
+                self._ledger_append({"type": "result", "data": result})
+                return result
             # v29 regex fallback: tool call embedded in text, not in tool_calls
             if ('"tool_call"' in text_out or '"name":' in text_out) and "get_current_time" in text_out:
                 try:
@@ -482,7 +521,8 @@ class CMESocket:
                          "resident_id": rid, "slot": alloc["slot"], "allocation": alloc,
                          "inference_error": str(e), "autonomy": grant["autonomy"],
                          "distillation_hook": grant["distillation_hook"]}
-            return {"contract": "r3a.steward-operation-result.v1", "correlation_id": f"r5-err-{int(time.time()*1000)}",
+            # v35.4: record except-branch local-fallback results too.
+            _res485 = {"contract": "r3a.steward-operation-result.v1", "correlation_id": f"r5-err-{int(time.time()*1000)}",
                     "status": "local-fallback",
                     "result": {"mode": "grace-80b-local", "tool_mode": "grace-80b-local",
                                "message": fallback_msg, "text": fallback_msg, "resident": rid,
@@ -490,6 +530,8 @@ class CMESocket:
                                "slot": alloc["slot"], "allocation": alloc,
                                "tools": TOOLS_OPENAI, "tool_registry": TOOL_NAMES},
                     "grant": grant_err}
+            self._ledger_append({"type": "result", "data": _res485})
+            return _res485
 
 
 socket_instance = CMESocket()
