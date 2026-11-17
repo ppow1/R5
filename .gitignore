@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.bak
+*.bak.*
+data/ledger.jsonl
+dashboard/*.bak*
+website/__pycache__/
