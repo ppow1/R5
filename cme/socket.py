@@ -1,6 +1,26 @@
 """
-R5 CME Socket v35.7 IDENTITY + HISTORY + EMBED DRAFT - FOR REVIEW, NOT DEPLOYED
-v35.7 = v35.6 + identity fix + history load + embed use, minimal, draft only.
+R5 CME Socket v35.8 EPISTEMIC FACTS DRAFT - FOR REVIEW, NOT DEPLOYED
+v35.8 = v35.7 + epistemic fact fix, minimal, draft only.
+Pat 2026-11-17 16:55 EST: the v35.7 dashboard test (conv-jessica-1794951244679)
+proved identity + history fixed, but Jessica invented facts and applied her
+RELAXED epistemic level to facts: height 5'7" "my dossier says so" (no height
+field exists in the dossier), Grace = "Head of Archives" (wrong, Director
+Ops), "12 residents, three unverified anomalies" (wrong, 13, no anomalies),
+"The Librarian" (invented, no such resident). She also twice chose NOT to
+call any tool for factual questions (OctoMiner IP, resident list) and asked
+permission instead, while the same garbled IP query DID call KB in a direct
+test and returned 192.168.1.160. Diagnosis, Pat: relaxed is for creative /
+personality writing only, never for facts - that is what the epistemic
+system is for. Fix, three layers so a coin-flip tool choice cannot break it:
+(A) system prompt: explicit FACTS ARE NEVER RELAXED rule; (B) tool
+descriptions: call KB/world_knowledge before any factual answer, never
+invent a dossier field; (C) code safety net: dispatch pre-runs _kb_search
+for factual-looking questions and injects the verified hits into the
+system prompt, so the model has the facts even if it calls no tool.
+Resident roster added to the KB known facts, so a resident-list question
+has a real answer to retrieve. No height fact exists anywhere in Riverview
+(Pat: nobody there is 5'7") - the correct answer to "how tall are you" is
+"not in my dossier", never an invented number.
 Pat 2026-11-17 16:04 EST: delete empty r3a_concepts (done live, 0 rows, only
 r5_concepts remains); draft history-load fix; embed device (3060 Ti, 8081/8082)
 was installed but never used - use it now.
@@ -183,9 +203,9 @@ SHORT_TITLES = {"alyssa": "Chief of Staff", "grace": "Director Ops", "chloe": "C
 # v31 TOOLS_OPENAI, verbatim tool definitions
 TOOLS_OPENAI = [
  {"type": "function", "function": {"name": "get_current_time", "description": "Get current EST time and date. CALL THIS when user asks time/date. Do NOT hallucinate time, CALL tool.", "parameters": {"type": "object", "properties": {"timezone": {"type": "string"}}, "required": []}}},
- {"type": "function", "function": {"name": "knowledge_base_search", "description": "Local-first search Riverview knowledge base ledger.jsonl. ALWAYS search this BEFORE answering factual questions.", "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
- {"type": "function", "function": {"name": "self_knowledge", "description": "Check own dossier 011. Pass resident_id = your own resident id in this conversation (e.g. jessica). Never pass grace unless you are Grace.", "parameters": {"type": "object", "properties": {"resident_id": {"type": "string"}}, "required": ["resident_id"]}}},
- {"type": "function", "function": {"name": "world_knowledge", "description": "Search governing ledger 010", "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
+ {"type": "function", "function": {"name": "knowledge_base_search", "description": "Local-first search Riverview knowledge base ledger.jsonl. ALWAYS call this BEFORE answering any factual question about a device, IP address, resident, or the Estate. If it returns no hits, say you do not know - never invent the answer.", "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
+ {"type": "function", "function": {"name": "self_knowledge", "description": "Check your own dossier. Only quote fields that are actually in the dossier. If a field (for example height) is not in the dossier, say it is not listed - do not invent it. Pass resident_id = your own resident id in this conversation (e.g. jessica). Never pass grace unless you are Grace.", "parameters": {"type": "object", "properties": {"resident_id": {"type": "string"}}, "required": ["resident_id"]}}},
+ {"type": "function", "function": {"name": "world_knowledge", "description": "Search governing ledger 010 for facts about residents and the Estate. ALWAYS call this before listing residents or stating a resident's role. Never list residents from memory.", "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
  {"type": "function", "function": {"name": "generate_work_order", "description": "Create work order", "parameters": {"type": "object", "properties": {"title": {"type": "string"}, "description": {"type": "string"}}, "required": ["title"]}}},
  {"type": "function", "function": {"name": "generate_image", "description": "Generate image", "parameters": {"type": "object", "properties": {"prompt": {"type": "string"}}, "required": ["prompt"]}}},
  {"type": "function", "function": {"name": "flag_knowledge_for_review", "description": "Flag knowledge that changed, cite source", "parameters": {"type": "object", "properties": {"old_fact": {"type": "string"}, "new_fact": {"type": "string"}, "source": {"type": "string"}, "citation": {"type": "string"}}, "required": ["old_fact", "new_fact"]}}},
@@ -342,7 +362,16 @@ def _kb_search(q):
              "octominer 2": "192.168.1.162", "octo2": "192.168.1.162",
              "camrui": "192.168.1.155",
              "clipboard": "Clear-Host, variable, ssh alias camrui, Set-Clipboard",
-             "ssh aliases": "camrui 192.168.1.155 admin1, octo1 192.168.1.160 root, octo2 192.168.1.162, pikvm, video1"}
+             "ssh aliases": "camrui 192.168.1.155 admin1, octo1 192.168.1.160 root, octo2 192.168.1.162, pikvm, video1",
+             "residents of riverview": "Alyssa Chief of Staff, Cheryl CPA, Chloe Chief Architect, Eleanor Archives, Evelyn Confidant, Gray GM, Grace Director Ops, Helen HR, Ingrid Security Chief, Jessica Chief Character, Judy Legal, Marie Research, Vicky Engineering chief - 13 residents total",
+             "grace": "Grace Director Ops",
+             "eleanor": "Eleanor Archives",
+             "vicky": "Vicky Engineering chief",
+             "ingrid": "Ingrid Security Chief",
+             "cheryl": "Cheryl CPA",
+             "helen": "Helen HR",
+             "judy": "Judy Legal",
+             "librarian": "There is no resident called the Librarian. Eleanor is Archives."}
     for k, v in known.items():
         if k in ql:
             hits.insert(0, f"{k}={v}")
@@ -365,6 +394,28 @@ def _kb_search(q):
         hits = [c for _, c in scored]
     return {"tool": "knowledge_base_search", "query": q, "hits": hits[:10], "local_first": True,
             "found": bool(hits)}
+
+
+_FACTUAL_RE = re.compile(r"\b(ip address|ip\b|what is|what are|who is|who are|list|names of|how tall|how many|how old|where is|octominer|camrui|resident|dossier|grace|vicky|ingrid|cheryl|helen|judy|eleanor|evelyn|alyssa|chloe|marie|gray)", re.I)
+
+
+def _factual_kb_hits(text):
+    # v35.8 safety net: the dashboard test proved the model sometimes
+    # answers factual questions with NO tool call at all (OctoMiner IP,
+    # resident list) and then invents. Pre-run the KB search for
+    # factual-looking questions and return the hits, so dispatch can
+    # inject verified facts into the system prompt whether or not the
+    # model calls a tool. Returns None when the question is not
+    # factual-looking or the KB has nothing - never invents hits.
+    t = _safe(text)
+    if not t or not _FACTUAL_RE.search(t):
+        return None
+    try:
+        res = _kb_search(t)
+    except Exception:
+        return None
+    hits = [h for h in (res.get("hits") or []) if isinstance(h, str)]
+    return hits[:5] if hits else None
 
 
 def _exec_tool(name, args, rid=None):
@@ -407,7 +458,7 @@ def _exec_tool(name, args, rid=None):
     return {"tool": name, "error": "unknown"}
 
 
-def _build_msgs(op, dos, display_name="", role="", slot="", history=None):
+def _build_msgs(op, dos, display_name="", role="", slot="", history=None, kb_hits=None):
     # v35.1: build system prompt from dossier parts, v29 style.
     # v35/v31 hardcoded a generic prompt and ignored dos, so Grace
     # sounded like generic Qwen. No invented personality: every
@@ -463,6 +514,25 @@ def _build_msgs(op, dos, display_name="", role="", slot="", history=None):
                      "Time/date: MUST call get_current_time tool, NEVER invent time.")
     except Exception:
         parts.append("Time/date: MUST call get_current_time tool, NEVER invent time.")
+    # v35.8 EPISTEMIC RULE - FACTS ARE NEVER RELAXED. Pat's diagnosis
+    # 2026-11-17 16:55 EST: Jessica applied her relaxed epistemic level
+    # to facts (invented height 5'7", wrong Grace role, invented
+    # Librarian). Relaxed is for creative/personality writing ONLY.
+    parts.append("EPISTEMIC RULE - FACTS ARE NEVER RELAXED: Your dossier's epistemic level (for Jessica: relaxed) "
+                 "applies ONLY to creative and personality writing - stories, jokes, flirting, mood, roleplay. "
+                 "It NEVER applies to facts. A fact is any device, IP address, resident name or role, dossier field, "
+                 "number, measurement, date, or list. Before stating any fact, you MUST call the matching tool first - "
+                 "knowledge_base_search or world_knowledge for devices, IPs, residents and the Estate; self_knowledge "
+                 "for your own dossier - and use ONLY what the tool returned. If the tool returns nothing, say you do "
+                 "not know. Never invent a fact, never fill in a missing dossier field, never cite a dossier or ledger "
+                 "entry that does not contain it. A height, IP, name, or role that is not in a tool result does not "
+                 "exist. Creative writing is free; facts are not.")
+    # v35.8: verified facts pre-searched by dispatch, so the model has
+    # them even if it calls no tool this turn.
+    if kb_hits:
+        parts.append("VERIFIED FACTS from the knowledge base, retrieved for this question - use ONLY these for factual "
+                     "claims in your reply. Do not add facts that are not here: " +
+                     "; ".join(_safe(str(h), 300) for h in kb_hits))
     # v31 core, kept verbatim in substance
     parts.append("Philosophy: local-first KB saves rediscovery cost. Facts verified not hallucinated. "
                  "Use epistemic spans: fact needs citation, inference ~, dialogic roleplay purple never green fact, "
@@ -706,7 +776,7 @@ class CMESocket:
                                "text": json.dumps(res), "resident": rid, "tool_result": res}, "grant": grant}
             self._ledger_append({"type": "result", "data": _res389})
             return _res389
-        msgs = _build_msgs({"text": safe}, dos, display_name, role, slot=alloc["slot"], history=_load_history(conv_id))
+        msgs = _build_msgs({"text": safe}, dos, display_name, role, slot=alloc["slot"], history=_load_history(conv_id), kb_hits=_factual_kb_hits(safe))
         headers = {"Content-Type": "application/json", "X-R5-Source": "camrui-155",
                    "X-R5-Slot": alloc["slot"], "X-R5-Resident": rid}
         try:
