@@ -1,6 +1,24 @@
 """
-R5 CME Socket v35.8 EPISTEMIC FACTS DRAFT - FOR REVIEW, NOT DEPLOYED
-v35.8 = v35.7 + epistemic fact fix, minimal, draft only.
+R5 CME Socket v35.9 EPISTEMIC PLUGIN WIRING DRAFT - FOR REVIEW, NOT DEPLOYED
+v35.9 = v35.8 + epistemic spans via plugin, thin socket wiring only.
+Pat 2026-11-18 06:56 EST: "go" on Phase 1, design v1 defaults D1-D5.
+Pat 2026-11-17 18:04 EST correction: the socket must NOT grade spans -
+that is a plugin. Grading lives in r5-epistemic (provides
+epistemic.verify + epistemic.prompt, manifest + plugin.py, stdlib only).
+The socket only: (a) includes the plugin's prompt fragment in _build_msgs
+if the plugin answers, (b) passes reply text + this turn's tool results +
+pre-seeded KB hits + dossier level to epistemic.verify after inference,
+(c) attaches the plugin's graded spans to the result. If the plugin is
+missing/fails, the reply goes out ungraded with epistemic_status
+"unavailable - epistemic plugin not active" - never stamped verified.
+No grading logic in this file. The vague span sentence at line 538 is
+removed; the plugin's prompt fragment replaces it.
+D1 colors/fonts: design defaults (fact green, inference amber italic,
+unknown grey dashed + ?, roleplay purple italic) - dashboard Phase 2.
+D2 Vicky: task-level strict - dossier stays balanced, engineering /
+work-order / objective task_class forces strict in the plugin.
+D3 untagged text -> unknown, coverage tracked. D4 strict + roleplay ->
+downgraded to unknown + flagged. D5 post-chat reverify worker: later.
 Pat 2026-11-17 16:55 EST: the v35.7 dashboard test (conv-jessica-1794951244679)
 proved identity + history fixed, but Jessica invented facts and applied her
 RELAXED epistemic level to facts: height 5'7" "my dossier says so" (no height
@@ -458,7 +476,7 @@ def _exec_tool(name, args, rid=None):
     return {"tool": name, "error": "unknown"}
 
 
-def _build_msgs(op, dos, display_name="", role="", slot="", history=None, kb_hits=None):
+def _build_msgs(op, dos, display_name="", role="", slot="", history=None, kb_hits=None, epi_prompt=None):
     # v35.1: build system prompt from dossier parts, v29 style.
     # v35/v31 hardcoded a generic prompt and ignored dos, so Grace
     # sounded like generic Qwen. No invented personality: every
@@ -533,9 +551,13 @@ def _build_msgs(op, dos, display_name="", role="", slot="", history=None, kb_hit
         parts.append("VERIFIED FACTS from the knowledge base, retrieved for this question - use ONLY these for factual "
                      "claims in your reply. Do not add facts that are not here: " +
                      "; ".join(_safe(str(h), 300) for h in kb_hits))
+    # v35.9: span instruction comes from the r5-epistemic plugin, not
+    # from a vague sentence in core. If the plugin is absent, there is
+    # no span instruction - honest, no grading, no pretending.
+    if epi_prompt:
+        parts.append(epi_prompt)
     # v31 core, kept verbatim in substance
     parts.append("Philosophy: local-first KB saves rediscovery cost. Facts verified not hallucinated. "
-                 "Use epistemic spans: fact needs citation, inference ~, dialogic roleplay purple never green fact, "
                  "unknown needs verification. Autonomy: If not turned base, continue finding work. "
                  "Tools available via API - CALL them, do not hallucinate.")
     sys = "\n\n".join(parts)
@@ -579,6 +601,32 @@ class CMESocket:
         if self.plugins is None:
             raise ValueError(f"plugin registry unavailable: {self.plugin_error}")
         return self.plugins.invoke(capability, **kwargs)
+
+    # --- v35.9 epistemic wiring: THIN ONLY. No grading logic here.
+    # The r5-epistemic plugin owns the span contract. These helpers
+    # never raise: a missing/failed plugin means ungraded, honestly.
+    def _epistemic_prompt(self):
+        try:
+            res = self.plugin_invoke("epistemic.prompt")
+            inner = (res or {}).get("result") or {}
+            return inner.get("prompt") if isinstance(inner, dict) else None
+        except Exception:
+            return None
+
+    def _epistemic_grade(self, text, executed, kb_hits, resident_level, task_class):
+        try:
+            res = self.plugin_invoke(
+                "epistemic.verify", text=text,
+                tool_results=[e.get("result") for e in (executed or [])],
+                kb_hits=kb_hits or [], resident_level=resident_level,
+                task_class=task_class)
+            inner = (res or {}).get("result") or {}
+            if isinstance(inner, dict) and inner.get("status") == "graded":
+                return inner
+        except Exception:
+            pass
+        return {"status": "unavailable - epistemic plugin not active",
+                "spans": None, "summary": None, "clean_text": text}
 
     def plugin_reload(self):
         if self.plugins is None:
@@ -776,7 +824,9 @@ class CMESocket:
                                "text": json.dumps(res), "resident": rid, "tool_result": res}, "grant": grant}
             self._ledger_append({"type": "result", "data": _res389})
             return _res389
-        msgs = _build_msgs({"text": safe}, dos, display_name, role, slot=alloc["slot"], history=_load_history(conv_id), kb_hits=_factual_kb_hits(safe))
+        kb_hits = _factual_kb_hits(safe)
+        epi_level = ((dos or {}).get("epistemic_config") or {}).get("level", "balanced")
+        msgs = _build_msgs({"text": safe}, dos, display_name, role, slot=alloc["slot"], history=_load_history(conv_id), kb_hits=kb_hits, epi_prompt=self._epistemic_prompt())
         headers = {"Content-Type": "application/json", "X-R5-Source": "camrui-155",
                    "X-R5-Slot": alloc["slot"], "X-R5-Resident": rid}
         try:
@@ -840,18 +890,20 @@ class CMESocket:
                 text_final = _msg.get("content", "") or text_final
                 tool_calls = _msg.get("tool_calls", [])
             if executed:
+                _grade = self._epistemic_grade(text_final, executed, kb_hits, epi_level, tclass)
                 result = {"contract": "r3a.steward-operation-result.v1", "correlation_id": f"r5-op-{int(time.time()*1000)}",
                           "status": "completed",
                           "result": {"mode": "grace-80b", "tool_mode": "grace-80b-v31-toolcalled",
-                                     "message": text_final, "text": text_final, "resident": rid,
+                                     "message": _grade["clean_text"], "text": _grade["clean_text"], "resident": rid,
                                      "display_name": display_name, "role": role, "conversation_id": conv_id,
                                      "slot": alloc["slot"], "allocation": alloc,
                                      "tools_called": executed, "tools_discoverable": len(TOOLS_OPENAI),
-                                     "tool_registry": TOOL_NAMES, "epistemic_required": True,
+                                     "tool_registry": TOOL_NAMES, "epistemic_status": _grade["status"],
+                                     "epistemic_spans": _grade["spans"], "epistemic_summary": _grade["summary"],
                                      "inference": {"host": self.host, "port": self.port, "model": self.model, "path": self.path}},
                           "grant": grant}
                 self._ledger_append({"type": "result", "data": result})
-                _append_history(conv_id, safe, text_final)
+                _append_history(conv_id, safe, _grade["clean_text"])
                 return result
             # v29 regex fallback: tool call embedded in text, not in tool_calls
             if ('"tool_call"' in text_out or '"name":' in text_out) and "get_current_time" in text_out:
@@ -867,18 +919,20 @@ class CMESocket:
                             executed.append({"name": tname, "result": tool_result})
                 except Exception:
                     pass
+            _grade = self._epistemic_grade(text_out, executed, kb_hits, epi_level, tclass)
             result = {"contract": "r3a.steward-operation-result.v1", "correlation_id": f"r5-op-{int(time.time()*1000)}",
                       "status": "completed",
                       "result": {"mode": "grace-80b", "tool_mode": "grace-80b-v31-notool",
-                                 "message": text_out, "text": text_out, "resident": rid,
+                                 "message": _grade["clean_text"], "text": _grade["clean_text"], "resident": rid,
                                  "display_name": display_name, "role": role, "conversation_id": conv_id,
                                  "slot": alloc["slot"], "allocation": alloc,
                                  "tools_called": executed, "tools_discoverable": len(TOOLS_OPENAI),
-                                 "tool_registry": TOOL_NAMES, "epistemic_required": True,
+                                 "tool_registry": TOOL_NAMES, "epistemic_status": _grade["status"],
+                                 "epistemic_spans": _grade["spans"], "epistemic_summary": _grade["summary"],
                                  "inference": {"host": self.host, "port": self.port, "model": self.model, "path": self.path}},
                       "grant": grant}
             self._ledger_append({"type": "result", "data": result})
-            _append_history(conv_id, safe, text_out)
+            _append_history(conv_id, safe, _grade["clean_text"])
             return result
         except Exception as e:
             # v31 local-fallback, verbatim message, plus v27e steward shape

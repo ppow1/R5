@@ -1,0 +1,1 @@
+{"artifact_sha256": "2f71042eee887fd1e9116e1978cd5e80ff77a6d54a718a3f4526ed3a9250c2a4", "config": {}, "dependencies": [], "effect_class": "read", "enabled": true, "entrypoint": "plugin.py", "plugin_id": "r5-epistemic", "plugin_version": "1.0.0", "provides": ["epistemic.verify", "epistemic.prompt"], "requires_grant": null, "schema_version": 1}
