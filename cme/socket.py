@@ -1,6 +1,33 @@
 """
-R5 CME Socket v35.6 PLUGIN WIRING DRAFT - FOR REVIEW, NOT DEPLOYED
-v35.6 = v35.5 + Phase 0 plugin wiring, minimal, draft only.
+R5 CME Socket v35.7 IDENTITY + HISTORY + EMBED DRAFT - FOR REVIEW, NOT DEPLOYED
+v35.7 = v35.6 + identity fix + history load + embed use, minimal, draft only.
+Pat 2026-11-17 16:04 EST: delete empty r3a_concepts (done live, 0 rows, only
+r5_concepts remains); draft history-load fix; embed device (3060 Ti, 8081/8082)
+was installed but never used - use it now.
+- IDENTITY (Jessica bug, proved live conv-jessica-1794945590013): _exec_tool
+  was stateless and defaulted self_knowledge to grace; tool schema made
+  resident_id optional with no instruction. Fix: dispatch threads its rid
+  into _exec_tool; self_knowledge uses args resident_id, else current rid,
+  else an honest error - never silently grace. Tool schema now requires
+  resident_id. _build_msgs drops hardcoded "Slot-1 reserved. Lead
+  operational residents." and adds speaker identity: user is Pat, Steward.
+  _dossier no longer defaults an empty rid to grace.
+- HISTORY: _build_msgs used to send [system, one user text] only; conv_id
+  was echoed, never looked up; no DB/memory was wired (r5_concepts 0 rows,
+  no event_ledger table, GRACE_STORE stale Nov 13, distillation hook only
+  a string). Fix: per-conversation history file data/conversations/<id>.jsonl,
+  append each completed turn, load last 6 turns into _build_msgs. observe()
+  now records conversation_id. LIMIT: history starts from first turn after
+  v35.7 install; old ledger results hold assistant text only, no user text,
+  so old turns cannot be fully reconstructed - do not claim otherwise.
+- EMBED: _kb_search now uses the 8081 embed service (BAAI/bge-m3, 1024-dim,
+  matches r5_concepts vector(1024)) to semantically rerank candidates
+  (known facts + ledger hits) by cosine similarity, with substring order
+  as fallback when embed is offline. This is what fixes garbled queries
+  like "optiminer one" -> octominer 1 = 192.168.1.160. r5_concepts DB
+  write is NOT in this draft: Postgres has no riverview role, so a DB
+  write from the socket would fail auth - Phase 2, needs that role/grant
+  first. Do not deploy until Pat approves and tests pass.
 Pat approved Phase 0 as is 2026-11-17 11:54 EST.
 - PluginRegistry (~/workspace/r5-phase0-plugins/plugin_system.py, 391 lines,
   12/12 tests PASS) is loaded best-effort at CMESocket startup from
@@ -78,6 +105,7 @@ MODEL = os.getenv("R5_QWEN_MODEL", os.getenv("R5_INFERENCE_MODEL", "/root/Qwen3-
 EMBED_HOST = os.getenv("R5_EMBED_HOST", "192.168.1.160")
 EMBED_PORT = int(os.getenv("R5_EMBED_PORT", "8081"))
 LEDGER_PATH = BASE / "data" / "ledger.jsonl"
+HISTORY_DIR = BASE / "data" / "conversations"
 DOSSIERS_PATH = BASE / "data" / "residents_dossiers"
 GRACE_SLOT = "slot-1"
 VICKY_SLOT = "slot-2"
@@ -156,7 +184,7 @@ SHORT_TITLES = {"alyssa": "Chief of Staff", "grace": "Director Ops", "chloe": "C
 TOOLS_OPENAI = [
  {"type": "function", "function": {"name": "get_current_time", "description": "Get current EST time and date. CALL THIS when user asks time/date. Do NOT hallucinate time, CALL tool.", "parameters": {"type": "object", "properties": {"timezone": {"type": "string"}}, "required": []}}},
  {"type": "function", "function": {"name": "knowledge_base_search", "description": "Local-first search Riverview knowledge base ledger.jsonl. ALWAYS search this BEFORE answering factual questions.", "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
- {"type": "function", "function": {"name": "self_knowledge", "description": "Check own dossier 011", "parameters": {"type": "object", "properties": {"resident_id": {"type": "string"}}, "required": []}}},
+ {"type": "function", "function": {"name": "self_knowledge", "description": "Check own dossier 011. Pass resident_id = your own resident id in this conversation (e.g. jessica). Never pass grace unless you are Grace.", "parameters": {"type": "object", "properties": {"resident_id": {"type": "string"}}, "required": ["resident_id"]}}},
  {"type": "function", "function": {"name": "world_knowledge", "description": "Search governing ledger 010", "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
  {"type": "function", "function": {"name": "generate_work_order", "description": "Create work order", "parameters": {"type": "object", "properties": {"title": {"type": "string"}, "description": {"type": "string"}}, "required": ["title"]}}},
  {"type": "function", "function": {"name": "generate_image", "description": "Generate image", "parameters": {"type": "object", "properties": {"prompt": {"type": "string"}}, "required": ["prompt"]}}},
@@ -182,7 +210,7 @@ def _dossier(rid):
     # v35 only tried BASE/data/residents/{rid}.json, which does not exist.
     # Rich file lives at BASE/residents/{rid}.v1.0.0.json and holds
     # prompt_components, character, mission, personality settings.
-    rid = (rid or "grace").lower()
+    rid = (rid or "unknown").lower()
     if rid == "gray_man":
         rid = "gm"
     ddir = BASE / "data" / "residents_dossiers"
@@ -225,6 +253,68 @@ def _now_est():
             "timestamp": now.timestamp(), "timezone": "EST", "real_time": True}
 
 
+def _history_path(conv_id):
+    safe = re.sub(r"[^A-Za-z0-9_-]", "_", str(conv_id or ""))[:120] or "unknown"
+    return HISTORY_DIR / f"{safe}.jsonl"
+
+
+def _load_history(conv_id, limit_turns=6):
+    # v35.7: durable per-conversation history, last N turns.
+    p = _history_path(conv_id)
+    turns = []
+    try:
+        if p.exists():
+            for line in p.read_text(errors="ignore").splitlines()[-limit_turns:]:
+                try:
+                    j = json.loads(line)
+                except Exception:
+                    continue
+                if j.get("user"):
+                    turns.append({"role": "user", "content": _safe(j["user"], 4000)})
+                if j.get("assistant"):
+                    turns.append({"role": "assistant", "content": _safe(j["assistant"], 4000)})
+    except Exception:
+        return []
+    return turns
+
+
+def _append_history(conv_id, user_text, assistant_text):
+    # v35.7: append one completed turn; silent on failure, like ledger.
+    try:
+        HISTORY_DIR.mkdir(parents=True, exist_ok=True)
+        with open(_history_path(conv_id), "a", encoding="utf-8") as f:
+            f.write(json.dumps({"ts": time.time(), "user": _safe(user_text, 8000),
+                                "assistant": _safe(assistant_text, 8000)}) + "\n")
+    except Exception:
+        pass
+
+
+def _embed_text(text):
+    # v35.7: use the installed embed service (8081, BAAI/bge-m3, 1024-dim).
+    # Returns a list of floats, or None when offline. Never raises.
+    try:
+        import urllib.request
+        body = json.dumps({"model": "BAAI/bge-m3", "input": _safe(text, 2000)}).encode()
+        req = urllib.request.Request(f"http://{EMBED_HOST}:{EMBED_PORT}/embeddings",
+                                     data=body, headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            j = json.loads(r.read())
+        vec = j["data"][0]["embedding"]
+        return [float(x) for x in vec]
+    except Exception:
+        return None
+
+
+def _cosine(a, b):
+    try:
+        import math
+        dot = sum(x * y for x, y in zip(a, b))
+        na = math.sqrt(sum(x * x for x in a)); nb = math.sqrt(sum(y * y for y in b))
+        return dot / (na * nb) if na and nb else 0.0
+    except Exception:
+        return 0.0
+
+
 def _kb_search(q):
     # v31 substring search, plus v29 known facts and JSON-parse fallback
     ledger = BASE / "data" / "ledger.jsonl"
@@ -256,11 +346,28 @@ def _kb_search(q):
     for k, v in known.items():
         if k in ql:
             hits.insert(0, f"{k}={v}")
+    # v35.7: semantic rerank with the embed device when it is up; fall
+    # back to substring order when it is offline. Candidates are the
+    # known facts plus ledger hits, so a garbled query ("optiminer one")
+    # can still match "octominer 1 = 192.168.1.160" by meaning, not spelling.
+    cands = []
+    for k, v in known.items():
+        cands.append(f"{k}={v}")
+    for h in hits:
+        cands.append(h if isinstance(h, str) else json.dumps(h)[:500])
+    qvec = _embed_text(q) if cands else None
+    if qvec:
+        scored = []
+        for c in cands[:10]:
+            vec = _embed_text(c)
+            scored.append((_cosine(qvec, vec) if vec else -1.0, c))
+        scored.sort(key=lambda x: x[0], reverse=True)
+        hits = [c for _, c in scored]
     return {"tool": "knowledge_base_search", "query": q, "hits": hits[:10], "local_first": True,
             "found": bool(hits)}
 
 
-def _exec_tool(name, args):
+def _exec_tool(name, args, rid=None):
     # v31 _exec_tool, verbatim behavior
     args = args or {}
     if name == "get_current_time":
@@ -268,7 +375,14 @@ def _exec_tool(name, args):
     if name == "knowledge_base_search":
         return _kb_search(args.get("query", ""))
     if name == "self_knowledge":
-        return {"tool": name, "dossier": _dossier(args.get("resident_id", "grace"))}
+        # v35.7: use the caller-supplied id, else the current resident
+        # threaded in from dispatch. Never silently fall back to grace:
+        # that was the Jessica bug (ledger: 3x Grace dossier returned).
+        who = (args.get("resident_id") or rid or "").lower() if isinstance(args.get("resident_id", ""), str) or rid else ""
+        who = (args.get("resident_id") or rid or "").strip().lower()
+        if not who:
+            return {"tool": name, "error": "resident_id required: no current resident supplied, refusing to default to grace"}
+        return {"tool": name, "dossier": _dossier(who)}
     if name == "world_knowledge":
         return _kb_search(args.get("query", ""))
     if name == "generate_work_order":
@@ -293,7 +407,7 @@ def _exec_tool(name, args):
     return {"tool": name, "error": "unknown"}
 
 
-def _build_msgs(op, dos, display_name="", role=""):
+def _build_msgs(op, dos, display_name="", role="", slot="", history=None):
     # v35.1: build system prompt from dossier parts, v29 style.
     # v35/v31 hardcoded a generic prompt and ignored dos, so Grace
     # sounded like generic Qwen. No invented personality: every
@@ -303,7 +417,12 @@ def _build_msgs(op, dos, display_name="", role=""):
     name = display_name or _safe(dos.get("display_name")) or "Grace"
     role = role or _safe(dos.get("role") or dos.get("short_title") or "")
     parts = []
-    parts.append(f"You are {name}, {role} at Riverview Estate. Slot-1 reserved. Lead operational residents. Accountable to the Steward during the CEO office vacancy.")
+    # v35.7: no hardcoded Slot-1 / Lead operational residents - that was
+    # Grace's slot and job, pasted onto every resident. Speaker identity:
+    # the user is Pat, the Steward, never the resident herself.
+    parts.append(f"You are {name}, {role} at Riverview Estate. You are talking to Pat, the Steward, final authority. The user is Pat, not you. Never claim the user's name is your name, and never claim you are Grace unless you are Grace.")
+    if slot:
+        parts.append(f"Your slot is {slot}.")
     # Lean dossier personality: traits + methods, e.g. Grace:
     # operational, playful, a little flirtatious, self-aware, institute-aware
     pers = dos.get("personality") or {}
@@ -350,7 +469,13 @@ def _build_msgs(op, dos, display_name="", role=""):
                  "unknown needs verification. Autonomy: If not turned base, continue finding work. "
                  "Tools available via API - CALL them, do not hallucinate.")
     sys = "\n\n".join(parts)
-    return [{"role": "system", "content": sys}, {"role": "user", "content": text}]
+    # v35.7: history first, then the current turn - this is what makes a
+    # conversation durable instead of fresh every turn.
+    msgs = [{"role": "system", "content": sys}]
+    for h in (history or []):
+        msgs.append(h)
+    msgs.append({"role": "user", "content": text})
+    return msgs
 
 
 class CMESocket:
@@ -464,7 +589,9 @@ class CMESocket:
             turned = False
             context_used = 0
         alloc = self._get_allocation(res)
-        obs = {"contract": "r3a.observation.v1", "observed_at": time.time(), "resident": res.lower(),
+        obs = {"contract": "r3a.observation.v1", "observed_at": time.time(),
+               "conversation_id": _safe(op.get("conversation_id", "") if isinstance(op, dict) else "") or None,
+               "resident": res.lower(),
                "slot": alloc["slot"], "allocation": alloc, "text_preview": text[:200],
                "tools_available": len(TOOLS_OPENAI),
                "autonomy": {"enabled": True, "turned_base": turned, "should_continue": not turned,
@@ -572,14 +699,14 @@ class CMESocket:
         # v31/v29 direct tool execution path
         if isinstance(observation, dict) and observation.get("tool_call"):
             tc = observation["tool_call"]
-            res = _exec_tool(tc.get("name"), tc.get("arguments", {}))
+            res = _exec_tool(tc.get("name"), tc.get("arguments", {}), rid=rid)
             # v35.4: record direct tool_call results too.
             _res389 = {"contract": "r3a.grant.v1", "granted": True, "task_class": tclass,
                     "result": {"mode": "grace-80b", "tool_mode": "tool-result", "message": json.dumps(res),
                                "text": json.dumps(res), "resident": rid, "tool_result": res}, "grant": grant}
             self._ledger_append({"type": "result", "data": _res389})
             return _res389
-        msgs = _build_msgs({"text": safe}, dos, display_name, role)
+        msgs = _build_msgs({"text": safe}, dos, display_name, role, slot=alloc["slot"], history=_load_history(conv_id))
         headers = {"Content-Type": "application/json", "X-R5-Source": "camrui-155",
                    "X-R5-Slot": alloc["slot"], "X-R5-Resident": rid}
         try:
@@ -623,7 +750,7 @@ class CMESocket:
                         args = json.loads(args_str) if isinstance(args_str, str) else args_str
                     except Exception:
                         args = {}
-                    res = _exec_tool(name, args)
+                    res = _exec_tool(name, args, rid=rid)
                     executed.append({"name": name, "result": res})
                     tool_results.append({"role": "tool", "tool_call_id": tc.get("id", f"call_{name}"),
                                          "name": name, "content": json.dumps(res)})
@@ -654,6 +781,7 @@ class CMESocket:
                                      "inference": {"host": self.host, "port": self.port, "model": self.model, "path": self.path}},
                           "grant": grant}
                 self._ledger_append({"type": "result", "data": result})
+                _append_history(conv_id, safe, text_final)
                 return result
             # v29 regex fallback: tool call embedded in text, not in tool_calls
             if ('"tool_call"' in text_out or '"name":' in text_out) and "get_current_time" in text_out:
@@ -664,7 +792,7 @@ class CMESocket:
                         if tname in TOOL_NAMES:
                             jm = json.loads(re.search(r'\{.*\}', text_out, re.DOTALL).group(0))
                             tc = jm.get("tool_call", jm)
-                            tool_result = _exec_tool(tc.get("name", tname), tc.get("arguments", {}))
+                            tool_result = _exec_tool(tc.get("name", tname), tc.get("arguments", {}), rid=rid)
                             text_out = text_out + f"\n\n[Tool executed: {tname} -> {json.dumps(tool_result)[:500]}]"
                             executed.append({"name": tname, "result": tool_result})
                 except Exception:
@@ -680,6 +808,7 @@ class CMESocket:
                                  "inference": {"host": self.host, "port": self.port, "model": self.model, "path": self.path}},
                       "grant": grant}
             self._ledger_append({"type": "result", "data": result})
+            _append_history(conv_id, safe, text_out)
             return result
         except Exception as e:
             # v31 local-fallback, verbatim message, plus v27e steward shape
