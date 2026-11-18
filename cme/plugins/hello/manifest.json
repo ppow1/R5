@@ -1,0 +1,1 @@
+{"artifact_sha256":"a9aeca5d8a9905dcca090a5c888075e205a8f9df8e144d51e62cfa0287b27a65","config":{"greeting_name":"Riverview"},"dependencies":[],"effect_class":"read","enabled":true,"entrypoint":"plugin.py","plugin_id":"r5.hello","plugin_version":"1.0.0","provides":["hello.greet"],"requires_grant":null,"schema_version":1}

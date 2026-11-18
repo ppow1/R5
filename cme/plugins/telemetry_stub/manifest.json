@@ -1,0 +1,1 @@
+{"artifact_sha256":"7380f9e419a76b2e8d57530fc956aff56452ad5ec86ca7a3d12c3cdc9934b4ac","config":{"host_id":"octominer1"},"dependencies":[],"effect_class":"read","enabled":true,"entrypoint":"plugin.py","plugin_id":"r5.telemetry-stub","plugin_version":"0.1.0","provides":["telemetry.read"],"requires_grant":"infrastructure.octominer.telemetry.read","schema_version":1}

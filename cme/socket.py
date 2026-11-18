@@ -1,4 +1,33 @@
 """
+R5 CME Socket v35.6 PLUGIN WIRING DRAFT - FOR REVIEW, NOT DEPLOYED
+v35.6 = v35.5 + Phase 0 plugin wiring, minimal, draft only.
+Pat approved Phase 0 as is 2026-11-17 11:54 EST.
+- PluginRegistry (~/workspace/r5-phase0-plugins/plugin_system.py, 391 lines,
+  12/12 tests PASS) is loaded best-effort at CMESocket startup from
+  cme/plugin_system.py (deployed layout) or the Phase 0 workspace copy.
+  If the loader is missing/broken, the socket still starts and core
+  dispatch works; plugin_* calls return an honest unavailable error.
+  Core behaviour is unchanged: multi-turn tool loop up to 4 turns,
+  7 OpenAI tools, personality, verified EST time, ledger appends,
+  heartbeat monitor-only, monitor-first local-fallback.
+- Wiring added, nothing else changed: monitor() reports plugin health;
+  dispatch() handles {"plugin_call": {"capability": ...}} (no inference
+  POST, ledger-appended, like the existing tool_call path); _exec_tool
+  handles internal name "invoke_plugin" via the direct tool_call path
+  (NOT added to TOOLS_OPENAI, so the model does not discover it yet;
+  grant-gating it as a Grace tool is Phase 5 work).
+- Event intake hook: plugin_emit_event(event) validates and ledger-appends
+  a {"type": "plugin_event"} entry. That is NOT a mailbox and does NOT
+  notify Grace yet. Phase 3 mailbox will consume plugin_event ledger
+  entries and deliver them to Grace. See WIRING.md for the event-driven
+  design requirement (Pat 2026-11-17 11:54 EST): Riverview must be
+  event-responsive, not chat-based; a fan failure / rising temps must
+  reach Grace as a message, nothing happening silently while Riverview
+  is oblivious. The plugin itself must already throw its own alarm/flag
+  in its own code; Riverview reactivity is a second layer, not a substitute.
+- 30B fast-load is deprioritized (Pat 2026-11-17 11:42 EST). No GPU switch.
+  This draft does not touch it.
+
 R5 CME Socket v35.4 MERGE DRAFT - FOR REVIEW, NOT DEPLOYED
 v35.3 + ledger completeness fix.
 - 2026-11-17 01:27 EST: Grace replied "hello again" in the dashboard
@@ -38,7 +67,7 @@ v35.2 + heartbeat noise fix.
 - Autonomy is not broken: real work arrives via website invoke
   with text/resident/conversation_id, not via heartbeat.
 """
-import os, json, re, time, pathlib, socket, datetime, http.client, traceback
+import os, json, re, time, pathlib, socket, datetime, http.client, traceback, importlib.util, sys
 from typing import Dict, Any, List
 
 BASE = pathlib.Path(__file__).parent.parent
@@ -52,6 +81,61 @@ LEDGER_PATH = BASE / "data" / "ledger.jsonl"
 DOSSIERS_PATH = BASE / "data" / "residents_dossiers"
 GRACE_SLOT = "slot-1"
 VICKY_SLOT = "slot-2"
+
+# --- Phase 0 plugin wiring (v35.6, minimal) ---
+# Deployed layout: cme/plugin_system.py + cme/plugins/<id>/manifest.json
+# Workspace layout (this draft): r5-phase0-plugins/plugin_system.py +
+# r5-phase0-plugins/plugins/<id>/. Env overrides, for tests:
+#   R5_PLUGIN_SYSTEM_PATH=/path/to/plugin_system.py
+#   R5_PLUGINS_DIR=/path/to/plugins
+# The loader is best-effort and never raises at import: if it is missing
+# or broken, CMESocket starts with plugins=None and plugin calls fail
+# honestly, core dispatch unaffected.
+def _plugin_candidates():
+    here = pathlib.Path(__file__).parent
+    cands = []
+    env = os.getenv("R5_PLUGIN_SYSTEM_PATH")
+    if env:
+        cands.append(pathlib.Path(env))
+    cands += [here / "plugin_system.py",
+              BASE / "cme" / "plugin_system.py",
+              here / "r5-phase0-plugins" / "plugin_system.py",
+              pathlib.Path.home() / "workspace" / "r5-phase0-plugins" / "plugin_system.py"]
+    return cands
+
+def _plugins_dir_candidates():
+    here = pathlib.Path(__file__).parent
+    cands = []
+    env = os.getenv("R5_PLUGINS_DIR")
+    if env:
+        cands.append(pathlib.Path(env))
+    cands += [here / "plugins",
+              BASE / "cme" / "plugins",
+              here / "r5-phase0-plugins" / "plugins",
+              pathlib.Path.home() / "workspace" / "r5-phase0-plugins" / "plugins"]
+    return cands
+
+def _load_plugin_registry():
+    """Return (registry_or_None, error_or_None). Never raises."""
+    for path in _plugin_candidates():
+        if not path.exists():
+            continue
+        try:
+            spec = importlib.util.spec_from_file_location("r5_plugin_system", path)
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules["r5_plugin_system"] = mod
+            spec.loader.exec_module(mod)
+            for pdir in _plugins_dir_candidates():
+                if pdir.exists():
+                    reg = mod.PluginRegistry(pdir)
+                    reg.discover()
+                    reg.activate_all()
+                    return reg, None
+            return None, f"plugin_system found at {path}, no plugins dir found"
+        except Exception as e:
+            return None, f"plugin loader failed at {path}: {e}"
+    return None, "plugin_system.py not found in any candidate location (see _plugin_candidates)"
+
 
 SLOT_RESERVATION = {
     "slot-1": {"resident": "grace", "pinned": True, "policy": "pinned"},
@@ -193,6 +277,19 @@ def _exec_tool(name, args):
         return {"tool": name, "queued": True}
     if name == "flag_knowledge_for_review":
         return {"tool": name, "flagged": True}
+    if name == "invoke_plugin":
+        # Internal only, NOT in TOOLS_OPENAI (model does not discover it).
+        # Called via dispatch({"tool_call": {"name": "invoke_plugin", ...}})
+        # or dispatch({"plugin_call": {...}}). Grant-gating is Phase 5.
+        cap = args.get("capability") or args.get("name") or ""
+        try:
+            inst = globals().get("socket_instance")
+            if inst is None or getattr(inst, "plugins", None) is None:
+                return {"tool": name, "error": "plugin registry unavailable",
+                        "detail": getattr(inst, "plugin_error", "no registry") if inst is not None else "no socket instance"}
+            return {"tool": name, "result": inst.plugin_invoke(cap, **(args.get("arguments") or {}))}
+        except Exception as e:
+            return {"tool": name, "error": "plugin invoke failed", "detail": _safe(str(e))}
     return {"tool": name, "error": "unknown"}
 
 
@@ -262,6 +359,54 @@ class CMESocket:
         self.port = PORT
         self.path = PATH
         self.model = MODEL
+        # Phase 0: best-effort plugin registry. Failure here must never
+        # break core dispatch; plugin calls then fail honestly.
+        try:
+            self.plugins, self.plugin_error = _load_plugin_registry()
+        except Exception as e:
+            self.plugins, self.plugin_error = None, f"plugin registry init failed: {e}"
+
+    # --- Phase 0 plugin API (v35.6) ---
+    def plugin_health(self):
+        if self.plugins is None:
+            return {"available": False, "core": "healthy",
+                    "error": self.plugin_error or "no registry"}
+        h = self.plugins.health()
+        h["available"] = True
+        return h
+
+    def plugin_capabilities(self):
+        if self.plugins is None:
+            return {}
+        return self.plugins.capabilities()
+
+    def plugin_invoke(self, capability, **kwargs):
+        if self.plugins is None:
+            raise ValueError(f"plugin registry unavailable: {self.plugin_error}")
+        return self.plugins.invoke(capability, **kwargs)
+
+    def plugin_reload(self):
+        if self.plugins is None:
+            raise ValueError(f"plugin registry unavailable: {self.plugin_error}")
+        return self.plugins.reload()
+
+    def plugin_emit_event(self, event):
+        # Event intake hook, Phase 0. Validates and ledger-appends a
+        # plugin_event entry. This is NOT a mailbox and does NOT notify
+        # Grace yet — Phase 3 mailbox consumes these entries and delivers
+        # them. Honest status: recorded, not delivered.
+        if not isinstance(event, dict) or not event.get("type") or not event.get("source"):
+            raise ValueError("plugin event needs 'type' and 'source'")
+        entry = {"type": "plugin_event", "data": {
+            "event_type": event["type"], "source": event["source"],
+            "summary": _safe(event.get("summary", ""), 500),
+            "severity": event.get("severity", "info"),
+            "at": time.time(), "delivered_to_grace": False,
+            "note": "recorded only; Phase 3 mailbox delivers to Grace"}}
+        self._ledger_append(entry)
+        return {"queued": True, "recorded": True, "delivered_to_grace": False,
+                "event_type": event["type"], "source": event["source"],
+                "note": "Phase 3 mailbox not built yet; event is in the ledger"}
 
     def _get_allocation(self, rid):
         return CONTENT_ALLOCATION.get((rid or "grace").lower(), CONTENT_ALLOCATION["other"])
@@ -303,6 +448,7 @@ class CMESocket:
         st["allocation"] = CONTENT_ALLOCATION
         st["reservation"] = SLOT_RESERVATION
         st["embed"] = self._embed_status()
+        st["plugins"] = self.plugin_health()
         return st
 
     def observe(self, op=None, capability="conversation", task_class="v1.0.0-conversation", resident="grace", conversation_id=None):
@@ -366,7 +512,8 @@ class CMESocket:
         # conversation. Return monitor status only, no 80B POST, no tokens.
         _is_hb = False
         if isinstance(observation, dict):
-            _is_hb = observation.get("type") == "heartbeat" or (not safe.strip() and not observation.get("tool_call"))
+            # v35.6: plugin_call / tool_call with no text is work, not a heartbeat.
+            _is_hb = observation.get("type") == "heartbeat" or (not safe.strip() and not observation.get("tool_call") and not observation.get("plugin_call"))
         elif not safe.strip():
             _is_hb = True
         if _is_hb:
@@ -382,6 +529,26 @@ class CMESocket:
                                "inference": {"host": self.host, "port": self.port, "model": self.model, "path": self.path},
                                "monitor": _mon, "embed_status": embed_status},
                     "grant": grant}
+        # v35.6 plugin_call: no inference POST, like the tool_call path.
+        # dispatch({"plugin_call": {"capability": "telemetry.read"}})
+        # Ledger-appended, so a plugin call is visible in the ledger.
+        if isinstance(observation, dict) and observation.get("plugin_call"):
+            pc = observation["plugin_call"] or {}
+            cap = pc.get("capability") or pc.get("name") or ""
+            try:
+                pres = self.plugin_invoke(cap, **(pc.get("arguments") or {}))
+                _res_pc = {"contract": "r3a.grant.v1", "granted": True, "task_class": tclass,
+                        "result": {"mode": "grace-80b", "tool_mode": "plugin-result",
+                                   "message": json.dumps(pres), "text": json.dumps(pres),
+                                   "resident": rid, "plugin_result": pres}, "grant": grant}
+            except Exception as e:
+                _res_pc = {"contract": "r3a.grant.v1", "granted": True, "task_class": tclass,
+                        "result": {"mode": "grace-80b", "tool_mode": "plugin-result",
+                                   "message": json.dumps({"error": str(e)}),
+                                   "text": json.dumps({"error": str(e)}),
+                                   "resident": rid, "plugin_error": str(e)}, "grant": grant}
+            self._ledger_append({"type": "result", "data": _res_pc})
+            return _res_pc
         # v35.3 monitor-first: if inference is offline, do not POST.
         # Return local-fallback immediately, no ConnectionRefused traceback.
         _mon2 = self.monitor()
@@ -541,3 +708,11 @@ def dispatch(*a, **k):
     return socket_instance.dispatch(*a, **k)
 def monitor(*a, **k):
     return socket_instance.monitor(*a, **k)
+def plugin_health(*a, **k):
+    return socket_instance.plugin_health(*a, **k)
+def plugin_invoke(*a, **k):
+    return socket_instance.plugin_invoke(*a, **k)
+def plugin_reload(*a, **k):
+    return socket_instance.plugin_reload(*a, **k)
+def plugin_emit_event(*a, **k):
+    return socket_instance.plugin_emit_event(*a, **k)
