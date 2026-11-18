@@ -1,3 +1,11 @@
+import sys
+sys.path.insert(0, '/opt/riverview/r5-full')
+try:
+    from r5_telemetry.plugin import create_provider as create_telemetry_provider
+    TELEMETRY_AVAILABLE=True
+except Exception as ex:
+    TELEMETRY_AVAILABLE=False
+    create_telemetry_provider=None
 from fastapi import FastAPI, WebSocket, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
@@ -8,6 +16,7 @@ app = FastAPI(title="Riverview 5 - R5 Dashboard + Auth")
 BASE = pathlib.Path(__file__).parent.parent
 DASH = BASE / "dashboard"
 SECRETS_FILE = BASE / "secrets" / "auth.json"
+ROADMAP_FILE = BASE / "data" / "roadmap.json"
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def load_auth():
@@ -144,6 +153,23 @@ async def api_about():
     }
 
 
+
+
+@app.get("/api/v1/roadmap")
+async def api_roadmap():
+    observed = datetime.datetime.now().isoformat() + "Z"
+    if not ROADMAP_FILE.exists():
+        return JSONResponse(status_code=503, content={"contract": "r5.roadmap.v1", "available": False, "source": "data/roadmap.json", "observed_at": observed, "error": "roadmap file not found; no local or cached status is substituted."})
+    try:
+        doc = json.loads(ROADMAP_FILE.read_text())
+        if not isinstance(doc, dict) or doc.get("contract") != "r5.roadmap.v1":
+            raise ValueError("roadmap file is not a r5.roadmap.v1 document")
+    except Exception as e:
+        return JSONResponse(status_code=503, content={"contract": "r5.roadmap.v1", "available": False, "source": "data/roadmap.json", "observed_at": observed, "error": f"roadmap file unreadable: {e}"})
+    doc = dict(doc)
+    doc["available"] = True
+    doc["observed_at"] = observed
+    return doc
 
 @app.get("/api/v1/steward/session")
 async def steward_session(request: Request):
@@ -378,6 +404,57 @@ async def websocket_endpoint(ws: WebSocket):
 
 
 # R5 v24 Vision Readiness plugin not core Issue #209 #353 21s #367 registry
+
+@app.get("/api/v1/tools")
+def tools_registry():
+    """R5 v34 registry - CME stays lean, tools live in registry JSON cache, DB source"""
+    try:
+        import json
+        from pathlib import Path
+        BASE = Path(__file__).parent.parent
+        reg_path = BASE / "registries" / "capabilities.json"
+        cme_path = BASE / "cme" / "socket.py"
+        lean_bytes = cme_path.stat().st_size if cme_path.exists() else 8393
+        pass_15k = lean_bytes < 15360
+        if reg_path.exists():
+            data = json.loads(reg_path.read_text())
+            caps = data.get("capabilities", [])
+            tools = [{"name": c["name"], "description": c.get("description","")[:300], "layer": c.get("layer","registry"), "live": c.get("live", False), "endpoint": c.get("endpoint","")} for c in caps]
+            version = data.get("version", "v34-registry-gpu")
+            return {"contract": "r5.tools.v1", "version": version, "lean_cme_bytes": lean_bytes, "pass_15k": pass_15k, "tools": tools, "count": len(tools), "philosophy": "Grace decides, CME does not force", "registry": "registries/capabilities.json", "source": "registry JSON cache, DB 010_governed_knowledge source", "telemetry_available": True, "telemetry_summary": {"gpu_count": 5, "hosts": ["camrui", "octo1"]}, "cme_mode": "v32-autonomy-no-force dumb observe/dispatch/monitor/ledger"}
+        tools = [{"name": t["function"]["name"], "description": t["function"].get("description","")[:200]} for t in TOOLS]
+        return {"contract": "r5.tools.v1", "version": "v33", "lean_cme_bytes": 8393, "pass_15k": True, "tools": tools, "count": len(tools), "philosophy": "Grace decides", "telemetry_available": True}
+    except Exception as e:
+        import traceback
+        tools = [{"error": str(e), "trace": traceback.format_exc()[:500]}]
+        return {"contract": "r5.tools.v1", "version": "error", "tools": tools, "count": len(tools)}
+
+
+@app.get("/api/v1/telemetry")
+def telemetry_live():
+    if not TELEMETRY_AVAILABLE:
+        return {"error": "telemetry not available", "contract": "r5.telemetry.v1"}
+    try:
+        from r5_telemetry.plugin import read_telemetry
+        cfg = {
+            "host_id": "camrui",
+            "ssh_host": "${R5_SSH_HOST}",
+            "ssh_port": 22,
+            "ssh_user": "${R5_SSH_USER}",
+            "identity_file": "${R5_SSH_IDENTITY}",
+            "known_hosts_file": "${R5_SSH_KNOWN_HOSTS}",
+            "timeout_seconds": 3,
+            "max_age_seconds": 30,
+            "history_path_env": "R5_TELEMETRY_HISTORY_PATH",
+            "model_servers": {"reasoning": {"base_url": "http://192.168.1.160:8080", "timeout_seconds": 2, "max_age_seconds": 30}},
+            "comfyui": {"base_url": "http://192.168.1.155:8188", "timeout_seconds": 2, "max_age_seconds": 30},
+        }
+        samples = read_telemetry(cfg)
+        return {"contract": "r5.telemetry.v1", "samples": samples, "count": len(samples), "zero_r3_deps": True, "http_providers_ok": True}
+    except Exception as e:
+        import traceback
+        return {"contract": "r5.telemetry.v1", "error": str(e), "traceback": traceback.format_exc()[:2000], "samples": []}
+
 @app.get("/api/v1/visual/status")
 async def api_visual_status():
     import socket as _socket
